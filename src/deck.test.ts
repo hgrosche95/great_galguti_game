@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createDeck, shuffleDeck, handOutDeck } from './deck';
+import { createDeck, shuffle, handOutDeck } from './deck';
 
 describe('createDeck', () => {
   it('Deck contains 80 cards', () => {
@@ -23,7 +23,7 @@ describe('createDeck', () => {
 describe('shuffleDeck', () => {
   it('Shuffled deck contains the same cards as the original deck', () => {
     const originalDeck = createDeck();
-    const shuffledDeck = shuffleDeck(originalDeck);
+    const shuffledDeck = shuffle(originalDeck);
     expect(shuffledDeck).toHaveLength(originalDeck.length);
     const sortedOriginalDeck = [...originalDeck].sort((a, b) => a.value - b.value);
     const sortedShuffledDeck = [...shuffledDeck].sort((a, b) => a.value - b.value);
@@ -31,7 +31,7 @@ describe('shuffleDeck', () => {
   });
   it('Shuffled deck is not in the same order as the original deck', () => {
     const originalDeck = createDeck();
-    const shuffledDeck = shuffleDeck(originalDeck);
+    const shuffledDeck = shuffle(originalDeck);
     expect(shuffledDeck).not.toEqual(originalDeck);
   });
 });

@@ -12,18 +12,17 @@ export function createDeck(): Card[] {
     return deck;
 }
 
-export function shuffleDeck(deck: Card[]): Card[] {
-    const shuffledDeck: Card[] = [...deck];
-    for (let i = deck.length - 1; i > 0; i--) {
+export function shuffle<T>(array: T[]): T[] {
+    const shuffledArray: T[] = [...array];
+    for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
+        [shuffledArray[i], shuffledArray[j]] = [shuffledArray[j], shuffledArray[i]];
     }
-    return shuffledDeck;
+    return shuffledArray;
 }
 
 export function handOutDeck(deck: Card[], playerCount: number): Card[][] {
     const hands: Card[][] = Array.from({ length: playerCount }, () => []);
-
     for (let i = 0; i < deck.length; i++) {
         hands[i % playerCount].push(deck[i]);
     }
