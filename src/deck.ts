@@ -20,3 +20,12 @@ export function shuffleDeck(deck: Card[]): Card[] {
     }
     return shuffledDeck;
 }
+
+export function handOutDeck(deck: Card[], playerCount: number): Card[][] {
+    const hands: Card[][] = Array.from({ length: playerCount }, () => []);
+
+    for (let i = 0; i < deck.length; i++) {
+        hands[i % playerCount].push(deck[i]);
+    }
+    return hands;
+}

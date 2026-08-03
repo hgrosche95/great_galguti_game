@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createDeck, shuffleDeck } from './deck';
+import { createDeck, shuffleDeck, handOutDeck } from './deck';
 
 describe('createDeck', () => {
   it('Deck contains 80 cards', () => {
@@ -35,3 +35,23 @@ describe('shuffleDeck', () => {
     expect(shuffledDeck).not.toEqual(originalDeck);
   });
 });
+
+describe('handOutDeck', () => {
+  it('Hands out the deck evenly among players', () => {
+    const deck = createDeck();
+    const playerCount = 4;
+    const hands = handOutDeck(deck, playerCount);
+    expect(hands).toHaveLength(playerCount);
+    hands.forEach(hand => {
+      expect(hand).toHaveLength(deck.length / playerCount);
+    });
+    const playerCount2 = 3;
+    const hands2 = handOutDeck(deck, playerCount2);
+    expect(hands2).toHaveLength(playerCount2);
+    expect(hands2[0]).toHaveLength(Math.floor(deck.length / playerCount2)+1);
+    expect(hands2[1]).toHaveLength(Math.floor(deck.length / playerCount2)+1);
+    expect(hands2[2]).toHaveLength(Math.floor(deck.length / playerCount2));
+    const totalCards = hands.reduce((sum, hand) => sum + hand.length, 0);
+    expect(totalCards).toBe(deck.length);
+  });
+}); 
