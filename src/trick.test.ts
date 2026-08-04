@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { createTrickState, move, isTrickOver, getWinner, startNewTrick } from './trick';
+import { createTrickState, move, isTrickOver, getWinner, startNewTrick, game } from './trick';
 import { createPlayers } from './players';
+import { createDeck, handOutDeck } from './deck';
+import { shuffle } from './general';
 
 describe('createTrickState', () => {
   it('initializes with the given starting player and no previous move', () => {
@@ -289,5 +291,23 @@ describe('startNewTrick', () => {
     const result = startNewTrick(players, trickState);
 
     expect(result.currentPlayerId).toBe(2);
+  });
+});
+
+describe('game', () => {
+  it('runs to completion without throwing, across many random deals and player counts', () => {
+    for (let run = 0; run < 200; run++) {
+      const playerCount = 3 + (run % 6); // 3..8
+      const players = createPlayers(playerCount);
+      const deck = shuffle(createDeck());
+      const hands = handOutDeck(deck, players.length);
+      players.forEach((player, i) => {
+        player.hand = hands[i]!;
+      });
+
+      expect(() => game(players, players[0]!.id)).not.toThrow();
+      const remaining = players.filter(p => p.hand.length > 0).length;
+      expect(remaining).toBeLessThanOrEqual(1);
+    }
   });
 });
