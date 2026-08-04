@@ -4,7 +4,8 @@
   "description": "A turn based card game where players take turns playing cards from their hand to try and win the game. The game is played with a deck of number cards from 1 to 12 and consecutive amounts of cards and 2 jokers. You play by playing the same number cards and win by emptying your hand.",
   "main": "index.js",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",

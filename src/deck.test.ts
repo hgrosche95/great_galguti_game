@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createDeck, shuffle, handOutDeck } from './deck';
+import { createDeck, handOutDeck } from './deck';
+import { shuffle } from './general';
 
 describe('createDeck', () => {
   it('Deck contains 80 cards', () => {
