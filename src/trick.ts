@@ -48,3 +48,13 @@ export function move(players: Player[], playerId: number, cards: Card[], trickSt
     lastPlayerId: playerId,
   };
 }
+
+export function isTrickOver(players: Player[]): boolean {
+  const activePlayers = players.filter(player => player.isActive && player.hand.length > 0);
+  return activePlayers.length <= 1;
+}
+
+export function getWinner(players: Player[], trickState: TrickState): Player | null {
+  const winner = players.find(player => player.id === trickState.lastPlayerId);
+  return winner ?? null;
+} 
