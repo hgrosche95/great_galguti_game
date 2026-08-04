@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createTrickState, move, isTrickOver, getWinner } from './trick';
+import { createTrickState, move, isTrickOver, getWinner, startNewTrick } from './trick';
 import { createPlayers } from './players';
 
 describe('createTrickState', () => {
@@ -61,22 +61,38 @@ describe('move', () => {
     expect(players[0]!.hand).toHaveLength(2);
   });
 
-  it('handles passing: deactivates the player and keeps the previous move intact', () => {
+  it('rejects passing when opening a trick (no previous move yet)', () => {
     const players = createPlayers(3);
     players[0]!.hand = [{ value: 5, isJoker: false }];
-    players[1]!.hand = [{ value: 6, isJoker: false }];
-    players[2]!.hand = [{ value: 7, isJoker: false }];
     const trickState = createTrickState(1);
 
     const result = move(players, 1, [], trickState);
 
-    expect(result).not.toBe(false);
-    if (result !== false) {
-      expect(result.lastMove).toBeNull();
-      expect(result.lastPlayerId).toBeNull();
-      expect(result.currentPlayerId).toBe(2);
+    expect(result).toBe(false);
+    expect(players[0]!.isActive).toBe(true);
+  });
+
+  it('handles passing after an opening move: deactivates the player and keeps the previous move intact', () => {
+    const players = createPlayers(3);
+    players[0]!.hand = [{ value: 8, isJoker: false }];
+    players[1]!.hand = [{ value: 6, isJoker: false }];
+    players[2]!.hand = [{ value: 7, isJoker: false }];
+    const initialState = createTrickState(1);
+    const openingMove = [players[0]!.hand[0]!];
+    const stateAfterOpeningMove = move(players, 1, openingMove, initialState);
+    expect(stateAfterOpeningMove).not.toBe(false);
+
+    if (stateAfterOpeningMove !== false) {
+      const result = move(players, 2, [], stateAfterOpeningMove);
+
+      expect(result).not.toBe(false);
+      if (result !== false) {
+        expect(result.lastMove).toEqual(openingMove);
+        expect(result.lastPlayerId).toBe(1);
+        expect(result.currentPlayerId).toBe(3);
+      }
+      expect(players[1]!.isActive).toBe(false);
     }
-    expect(players[0]!.isActive).toBe(false);
   });
 
   it('accepts a follow-up move with the same count and a lower value', () => {
@@ -228,5 +244,50 @@ describe('getWinner', () => {
     const trickState = { ...createTrickState(1), lastPlayerId: 999 };
 
     expect(getWinner(players, trickState)).toBeNull();
+  });
+});
+
+describe('startNewTrick', () => {
+  it('returns the trick state unchanged when the trick is not over yet', () => {
+    const players = createPlayers(3);
+    players[0]!.hand = [{ value: 5, isJoker: false }];
+    players[1]!.hand = [{ value: 6, isJoker: false }];
+    players[2]!.hand = [{ value: 7, isJoker: false }];
+    const trickState = createTrickState(1);
+
+    const result = startNewTrick(players, trickState);
+
+    expect(result).toBe(trickState);
+  });
+
+  it('lets the trick winner start the new trick and reactivates every player with cards left', () => {
+    const players = createPlayers(3);
+    players[0]!.hand = [{ value: 5, isJoker: false }];
+    players[1]!.hand = [];
+    players[1]!.isActive = false;
+    players[2]!.hand = [{ value: 3, isJoker: false }];
+    players[2]!.isActive = false;
+    const trickState = { ...createTrickState(2), lastPlayerId: 1 };
+
+    const result = startNewTrick(players, trickState);
+
+    expect(result.currentPlayerId).toBe(1);
+    expect(result.lastMove).toBeNull();
+    expect(result.lastPlayerId).toBeNull();
+    expect(players[2]!.isActive).toBe(true);
+  });
+
+  it('lets the next player start when the winner has no cards left', () => {
+    const players = createPlayers(3);
+    players[0]!.hand = [];
+    players[1]!.hand = [{ value: 5, isJoker: false }];
+    players[1]!.isActive = false;
+    players[2]!.hand = [{ value: 3, isJoker: false }];
+    players[2]!.isActive = false;
+    const trickState = { ...createTrickState(2), lastPlayerId: 1 };
+
+    const result = startNewTrick(players, trickState);
+
+    expect(result.currentPlayerId).toBe(2);
   });
 });

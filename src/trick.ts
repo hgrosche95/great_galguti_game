@@ -21,6 +21,9 @@ export function move(players: Player[], playerId: number, cards: Card[], trickSt
     return false;
   }
   if(cards.length === 0) {
+    if (trickState.lastMove === null) {
+      return false; // The player opening a trick must play, not pass.
+    }
     const player = players.find(p => p.id === playerId);
     if (player) {
       player.isActive = false;
@@ -58,3 +61,22 @@ export function getWinner(players: Player[], trickState: TrickState): Player | n
   const winner = players.find(player => player.id === trickState.lastPlayerId);
   return winner ?? null;
 } 
+
+export function startNewTrick(players: Player[], trickState: TrickState): TrickState {
+  if (!isTrickOver(players)) {
+    return trickState;
+  }
+
+  const winner = getWinner(players, trickState)!;
+  for (const player of players) {
+    if (player.hand.length > 0) {
+      player.isActive = true;
+    }
+  }
+
+  const startingPlayerId = winner.hand.length > 0
+    ? winner.id
+    : nextActivePlayer(players, winner.id)!.id;
+
+  return createTrickState(startingPlayerId);
+}
