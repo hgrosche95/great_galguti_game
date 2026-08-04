@@ -43,8 +43,6 @@ Alle Module sind mit Vitest-Tests abgedeckt.
 
 ## Geplant
 
-- Neue Stichrunde starten (Rundengewinner wird Startspieler, Zustand zurücksetzen)
-- Gesamtes Spiel (mehrere Stichrunden bis zum Spielende) orchestrieren
-- Einfache Test-Bots
+- Spiel UI zur Visualisierung
 - Deployment nach Azure für Online-Mehrspieler-Partien
-- CI/Pipelines und geschützter `main`-Branch (nur per Merge Request)
+
