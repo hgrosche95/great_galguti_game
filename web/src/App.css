@@ -1,0 +1,209 @@
+.game {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  padding: 32px 20px 40px;
+  flex-grow: 1;
+}
+
+/* --- Card look, shared by hand cards, played cards and card backs --- */
+
+.card {
+  width: 56px;
+  height: 78px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-h);
+  flex-shrink: 0;
+}
+
+button.card {
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+button.card:hover {
+  transform: translateY(-6px);
+}
+
+.card.joker {
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.card.selected {
+  transform: translateY(-12px);
+  border-color: var(--accent);
+}
+
+.hand .card.playable {
+  border-color: var(--accent);
+  box-shadow: var(--shadow), 0 0 0 2px var(--accent-bg);
+}
+
+.hand button.card:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.hand button.card:disabled:hover {
+  transform: none;
+}
+
+.card.back {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--accent-bg),
+    var(--accent-bg) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  border-color: var(--accent-border);
+}
+
+/* --- Opponents row --- */
+
+.opponents {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.opponent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.opponent.active {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.opponent-name {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.opponent-count {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.card-stack {
+  display: flex;
+}
+
+.card-stack .card {
+  width: 34px;
+  height: 48px;
+}
+
+.card-stack .card:not(:first-child) {
+  margin-left: -22px;
+}
+
+/* --- Table (currently played cards) --- */
+
+.table {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-height: 130px;
+  justify-content: center;
+}
+
+.table-status {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.played-cards {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.table-hint {
+  color: var(--text);
+  font-style: italic;
+}
+
+/* --- Your hand --- */
+
+.hand-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+.selected-cards {
+  display: flex;
+  gap: 8px;
+  min-height: 78px;
+  justify-content: center;
+}
+
+.hand {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.card-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-row {
+  display: flex;
+  gap: 4px;
+}
+
+.card-group-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-h);
+  background: var(--accent-bg);
+  padding: 1px 9px;
+  border-radius: 999px;
+}
+
+.action-button {
+  font-size: 16px;
+  padding: 10px 28px;
+  border-radius: 8px;
+  border: none;
+  color: white;
+  background: var(--accent);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.action-button:hover {
+  opacity: 0.85;
+}

@@ -81,7 +81,7 @@ export function startNewTrick(players: Player[], trickState: TrickState): TrickS
   return createTrickState(startingPlayerId);
 }
 
-function chooseMove(player: Player, lastMove: Card[] | null): Card[] {
+export function chooseMove(player: Player, lastMove: Card[] | null): Card[] {
   const requiredCount = lastMove ? lastMove.length : null;
   const maxValue = lastMove ? getMoveValue(lastMove) : null;
   const isPlayableValue = (value: number) => maxValue === null || value < maxValue;
