@@ -28,6 +28,18 @@ function App() {
 
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
 
+  const [finishOrder, setFinishOrder] = useState<number[]>([]);
+
+  const recordFinishers = (currentPlayers: typeof players) => {
+    const newlyFinished = currentPlayers
+      .filter(p => p.hand.length === 0 && !finishOrder.includes(p.id))
+      .map(p => p.id);
+
+    if (newlyFinished.length > 0) {
+      setFinishOrder(prev => [...prev, ...newlyFinished]);
+    }
+  };
+
   const selectCard = (card: Card) => {
     if (selectedCards.includes(card)) {
       setSelectedCards(selectedCards.filter(c => c !== card));
@@ -42,13 +54,14 @@ function App() {
       setTrickState(newTrickState);
       setSelectedCards([]);
       setPlayers([...players]);
+      recordFinishers(players);
     } else {
       alert('Invalid move');
     }
   };
 
   useEffect(() => {
-    if (trickState.currentPlayerId === YOUR_ID || players.every(player => player.hand.length === 0)) {
+    if (trickState.currentPlayerId === YOUR_ID || players.filter(player => player.hand.length > 0).length <= 1) {
       return;
     }
 
@@ -67,6 +80,7 @@ function App() {
           setTrickState(result);
         }
         setPlayers([...players]);
+        recordFinishers(players);
       }
     }, 500);
 
@@ -75,7 +89,10 @@ function App() {
 
   const me = players.find(p => p.id === YOUR_ID)!;
   const others = players.filter(p => p.id !== YOUR_ID);
-  const gameOver = players.every(player => player.hand.length === 0);
+  const gameOver = players.filter(player => player.hand.length > 0).length <= 1;
+  const ranking = gameOver
+    ? [...finishOrder, ...players.filter(p => !finishOrder.includes(p.id)).map(p => p.id)]
+    : [];
 
   const maxValue = trickState.lastMove ? getMoveValue(trickState.lastMove) : null;
   const isPlayable = (card: Card) => card.isJoker || maxValue === null || card.value < maxValue;
@@ -122,6 +139,13 @@ function App() {
         <div className="table-status">
           {gameOver ? 'Spiel vorbei' : `${currentPlayerName} ${trickState.currentPlayerId === YOUR_ID ? 'bist dran' : 'ist am Zug'}`}
         </div>
+        {gameOver ? (
+          <ol className="ranking">
+            {ranking.map(id => (
+              <li key={id}>{id === YOUR_ID ? 'Du' : players.find(p => p.id === id)?.name}</li>
+            ))}
+          </ol>
+        ) : (
         <div className="played-cards">
           {trickState.lastMove && trickState.lastMove.length > 0 ? (
             trickState.lastMove.map((card, i) => (
@@ -133,6 +157,7 @@ function App() {
             <div className="table-hint">Noch nichts gelegt</div>
           )}
         </div>
+        )}
       </div>
 
       <div className="hand-area">
