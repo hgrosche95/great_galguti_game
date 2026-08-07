@@ -45,14 +45,16 @@ npm run dev     # Dev-Server mit Hot Reload, meist http://localhost:5173
 npm run build   # Typprüfung (tsc -b) + Produktions-Build
 ```
 
-Zeigt deine eigene Hand (nach Wert sortiert und gruppiert, spielbare Karten hervorgehoben), die Kartenanzahl der Mitspieler, den aktuellen Stich und lässt dich gegen 3 automatisch spielende Bots antreten.
+Zeigt deine eigene Hand (nach Wert sortiert und gruppiert, spielbare Karten hervorgehoben), die Kartenanzahl der Mitspieler, den aktuellen Stich, das Spielende samt Rangliste und lässt dich gegen 3 automatisch spielende Bots antreten.
+
+## Live-Deployment
+
+Die Web-UI ist unter **https://blue-sea-08b19cb0f.7.azurestaticapps.net** erreichbar (Azure Static Web Apps, Free-Tier). Jeder Push auf `main` deployed automatisch neu (siehe `.github/workflows/azure-static-web-apps.yml`); jeder Pull Request bekommt zusätzlich eine eigene Vorschau-Umgebung.
 
 ## Mitentwickeln
 
-Der `main`-Branch ist geschützt: Änderungen laufen über einen eigenen Branch + Pull Request, der erst gemerged werden kann, wenn die CI-Pipeline (Typprüfung + Tests aus `src/`, siehe `.github/workflows/ci.yml`) grün ist.
+Der `main`-Branch ist geschützt: Änderungen laufen über einen eigenen Branch + Pull Request, der erst gemerged werden kann, wenn die CI-Pipeline grün ist — Typprüfung + Tests aus `src/` (`test`-Check) und Build/Typprüfung von `web/` (`web`-Check), siehe `.github/workflows/ci.yml`.
 
 ## Geplant
 
-- Spielende in der UI anzeigen (aktuell passiert nach dem letzten Zug visuell nichts mehr)
-- CI auch auf das `web/`-Projekt ausweiten
-- Deployment nach Azure für Online-Mehrspieler-Partien
+- Echtes Online-Multiplayer: ein Server (WebSockets, Spielräume, mehrere echte Clients statt Bots)
