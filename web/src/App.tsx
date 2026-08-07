@@ -1,44 +1,56 @@
-import { createDeck, handOutDeck } from '../../src/deck';
-import { createPlayers } from '../../src/players';
-import { useState, useEffect } from 'react';
-import { shuffle } from '../../src/general';
-import { createTrickState, move, chooseMove, isTrickOver, startNewTrick } from '../../src/trick';
+import { useState, useEffect, useRef } from 'react';
 import { getMoveValue } from '../../src/rules';
 import type { Card } from '../../src/cards';
 import './App.css';
 
-const YOUR_ID = 1;
+interface ServerPlayer {
+  id: number;
+  name: string;
+  cardCount: number;
+  isActive: boolean;
+}
+
+interface ServerState {
+  type: 'state';
+  yourId: number;
+  currentPlayerId: number;
+  lastMove: Card[] | null;
+  yourHand: Card[];
+  players: ServerPlayer[];
+}
 
 function CardFace({ card }: { card: Card }) {
   return <>{card.isJoker ? 'J' : card.value}</>;
 }
 
 function App() {
-  const [players, setPlayers] = useState(() => {
-    const deck = shuffle(createDeck());
-    const initialPlayers = createPlayers(4);
-    const hands = handOutDeck(deck, initialPlayers.length);
-    initialPlayers.forEach((player, i) => {
-      player.hand = hands[i]!;
-    });
-    return initialPlayers;
-  });
-
-  const [trickState, setTrickState] = useState(() => createTrickState(players[0]!.id));
-
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
+  const [waitingCount, setWaitingCount] = useState(0);
+  const [serverState, setServerState] = useState<ServerState | null>(null);
 
-  const [finishOrder, setFinishOrder] = useState<number[]>([]);
+  const socketRef = useRef<WebSocket | null>(null);
 
-  const recordFinishers = (currentPlayers: typeof players) => {
-    const newlyFinished = currentPlayers
-      .filter(p => p.hand.length === 0 && !finishOrder.includes(p.id))
-      .map(p => p.id);
-
-    if (newlyFinished.length > 0) {
-      setFinishOrder(prev => [...prev, ...newlyFinished]);
-    }
+  const sendStart = () => {
+    socketRef.current?.send(JSON.stringify({ type: 'start' }));
   };
+
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8080');
+    socketRef.current = ws;
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'waiting') {
+        setWaitingCount(data.count);
+      } else if (data.type === 'state') {
+        setServerState(data);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, []);
 
   const selectCard = (card: Card) => {
     if (selectedCards.includes(card)) {
@@ -49,55 +61,29 @@ function App() {
   };
 
   const makeMove = (cards: Card[]) => () => {
-    const newTrickState = move(players, YOUR_ID, cards, trickState);
-    if (newTrickState) {
-      setTrickState(newTrickState);
-      setSelectedCards([]);
-      setPlayers([...players]);
-      recordFinishers(players);
-    } else {
-      alert('Invalid move');
-    }
+    socketRef.current?.send(JSON.stringify({
+      type: 'move',
+      cards: cards.map(c => ({ value: c.value, isJoker: c.isJoker })),
+    }));
+    setSelectedCards([]);
   };
 
-  useEffect(() => {
-    if (trickState.currentPlayerId === YOUR_ID || players.filter(player => player.hand.length > 0).length <= 1) {
-      return;
-    }
+  if (!serverState) {
+    return (
+      <div className="game">
+        <p>Warte auf Mitspieler: {waitingCount} verbunden</p>
+        <button onClick={sendStart}>Spiel starten</button>
+      </div>
+    );
+  }
 
-    const timer = setTimeout(() => {
-      const player = players.find(p => p.id === trickState.currentPlayerId);
-      if (!player) {
-        return;
-      }
+  const others = serverState.players.filter(p => p.id !== serverState.yourId);
+  const gameOver = serverState.players.filter(p => p.cardCount > 0).length <= 1;
 
-      const result = move(players, player.id, chooseMove(player, trickState.lastMove), trickState);
-
-      if (result !== false) {
-        if (isTrickOver(players)) {
-          setTrickState(startNewTrick(players, result));
-        } else {
-          setTrickState(result);
-        }
-        setPlayers([...players]);
-        recordFinishers(players);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [trickState, players]);
-
-  const me = players.find(p => p.id === YOUR_ID)!;
-  const others = players.filter(p => p.id !== YOUR_ID);
-  const gameOver = players.filter(player => player.hand.length > 0).length <= 1;
-  const ranking = gameOver
-    ? [...finishOrder, ...players.filter(p => !finishOrder.includes(p.id)).map(p => p.id)]
-    : [];
-
-  const maxValue = trickState.lastMove ? getMoveValue(trickState.lastMove) : null;
+  const maxValue = serverState.lastMove ? getMoveValue(serverState.lastMove) : null;
   const isPlayable = (card: Card) => card.isJoker || maxValue === null || card.value < maxValue;
 
-  const visibleHand = [...me.hand]
+  const visibleHand = [...serverState.yourHand]
     .filter(card => !selectedCards.includes(card))
     .sort((a, b) => a.value - b.value);
 
@@ -112,9 +98,9 @@ function App() {
   }
 
   const currentPlayerName =
-    trickState.currentPlayerId === YOUR_ID
+    serverState.currentPlayerId === serverState.yourId
       ? 'Du'
-      : (players.find(p => p.id === trickState.currentPlayerId)?.name ?? '?');
+      : (serverState.players.find(p => p.id === serverState.currentPlayerId)?.name ?? '?');
 
   return (
     <div className="game">
@@ -122,33 +108,26 @@ function App() {
         {others.map(player => (
           <div
             key={player.id}
-            className={`opponent${trickState.currentPlayerId === player.id ? ' active' : ''}`}
+            className={`opponent${serverState.currentPlayerId === player.id ? ' active' : ''}`}
           >
             <div className="opponent-name">{player.name}</div>
             <div className="card-stack">
-              {player.hand.map((_, i) => (
+              {Array.from({ length: player.cardCount }).map((_, i) => (
                 <div key={i} className="card back" />
               ))}
             </div>
-            <div className="opponent-count">{player.hand.length} Karten</div>
+            <div className="opponent-count">{player.cardCount} Karten</div>
           </div>
         ))}
       </div>
 
       <div className="table">
         <div className="table-status">
-          {gameOver ? 'Spiel vorbei' : `${currentPlayerName} ${trickState.currentPlayerId === YOUR_ID ? 'bist dran' : 'ist am Zug'}`}
+          {gameOver ? 'Spiel vorbei' : `${currentPlayerName} ${serverState.currentPlayerId === serverState.yourId ? 'bist dran' : 'ist am Zug'}`}
         </div>
-        {gameOver ? (
-          <ol className="ranking">
-            {ranking.map(id => (
-              <li key={id}>{id === YOUR_ID ? 'Du' : players.find(p => p.id === id)?.name}</li>
-            ))}
-          </ol>
-        ) : (
         <div className="played-cards">
-          {trickState.lastMove && trickState.lastMove.length > 0 ? (
-            trickState.lastMove.map((card, i) => (
+          {serverState.lastMove && serverState.lastMove.length > 0 ? (
+            serverState.lastMove.map((card, i) => (
               <div key={i} className={`card${card.isJoker ? ' joker' : ''}`}>
                 <CardFace card={card} />
               </div>
@@ -157,7 +136,6 @@ function App() {
             <div className="table-hint">Noch nichts gelegt</div>
           )}
         </div>
-        )}
       </div>
 
       <div className="hand-area">
@@ -196,7 +174,7 @@ function App() {
         <button
           className="action-button"
           onClick={makeMove(selectedCards)}
-          hidden={trickState.currentPlayerId !== YOUR_ID}
+          hidden={serverState.currentPlayerId !== serverState.yourId}
         >
           {selectedCards.length === 0 ? 'Passen' : 'Spielen'}
         </button>
