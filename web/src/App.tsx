@@ -16,6 +16,8 @@ interface ServerState {
   currentPlayerId: number;
   lastMove: Card[] | null;
   yourHand: Card[];
+  gameOver: boolean;
+  ranking: number[];
   players: ServerPlayer[];
 }
 
@@ -78,7 +80,7 @@ function App() {
   }
 
   const others = serverState.players.filter(p => p.id !== serverState.yourId);
-  const gameOver = serverState.players.filter(p => p.cardCount > 0).length <= 1;
+  const gameOver = serverState.gameOver;
 
   const maxValue = serverState.lastMove ? getMoveValue(serverState.lastMove) : null;
   const isPlayable = (card: Card) => card.isJoker || maxValue === null || card.value < maxValue;
@@ -125,17 +127,27 @@ function App() {
         <div className="table-status">
           {gameOver ? 'Spiel vorbei' : `${currentPlayerName} ${serverState.currentPlayerId === serverState.yourId ? 'bist dran' : 'ist am Zug'}`}
         </div>
-        <div className="played-cards">
-          {serverState.lastMove && serverState.lastMove.length > 0 ? (
-            serverState.lastMove.map((card, i) => (
-              <div key={i} className={`card${card.isJoker ? ' joker' : ''}`}>
-                <CardFace card={card} />
-              </div>
-            ))
-          ) : (
-            <div className="table-hint">Noch nichts gelegt</div>
-          )}
-        </div>
+        {gameOver ? (
+          <ol className="ranking">
+            {serverState.ranking.map(id => (
+              <li key={id}>
+                {id === serverState.yourId ? 'Du' : serverState.players.find(p => p.id === id)?.name}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <div className="played-cards">
+            {serverState.lastMove && serverState.lastMove.length > 0 ? (
+              serverState.lastMove.map((card, i) => (
+                <div key={i} className={`card${card.isJoker ? ' joker' : ''}`}>
+                  <CardFace card={card} />
+                </div>
+              ))
+            ) : (
+              <div className="table-hint">Noch nichts gelegt</div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="hand-area">

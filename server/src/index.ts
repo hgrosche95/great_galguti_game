@@ -14,6 +14,14 @@ let connections: Connection[] = [];
 let players: Player[] = [];
 let trickState: ReturnType<typeof createTrickState> | null = null;
 let nextPlayerId = 1;
+let finishOrder: number[] = [];
+
+function recordFinishers() {
+  const newlyFinished = players
+    .filter(p => p.hand.length === 0 && !finishOrder.includes(p.id))
+    .map(p => p.id);
+  finishOrder.push(...newlyFinished);
+}
 
 function broadcastWaitingCount() {
   const message = JSON.stringify({ type: 'waiting', count: connections.length });
@@ -49,6 +57,7 @@ socket.on('message', (raw) => {
       if (isTrickOver(players)) {
         trickState = startNewTrick(players, trickState);
       }
+      recordFinishers();
       broadcastGameState();
     }
   }
@@ -61,6 +70,8 @@ socket.on('message', (raw) => {
 });
 
 function startGame() {
+  finishOrder = [];
+
   players = connections.map(conn => ({
     id: conn.playerId,
     name: `Player ${conn.playerId}`,
@@ -95,6 +106,11 @@ function resolveCardsFromHand(hand: Card[], requested: { value: number; isJoker:
 function broadcastGameState() {
   if (!trickState) return;
 
+  const gameOver = players.filter(p => p.hand.length > 0).length <= 1;
+  const ranking = gameOver
+    ? [...finishOrder, ...players.filter(p => !finishOrder.includes(p.id)).map(p => p.id)]
+    : [];
+
   for (const conn of connections) {
     const me = players.find(p => p.id === conn.playerId)!;
     const state = {
@@ -103,6 +119,8 @@ function broadcastGameState() {
       currentPlayerId: trickState.currentPlayerId,
       lastMove: trickState.lastMove,
       yourHand: me.hand,
+      gameOver,
+      ranking,
       players: players.map(p => ({
         id: p.id,
         name: p.name,
