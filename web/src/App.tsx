@@ -29,11 +29,20 @@ function App() {
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
   const [waitingCount, setWaitingCount] = useState(0);
   const [serverState, setServerState] = useState<ServerState | null>(null);
+  const [name, setName] = useState('');
 
   const socketRef = useRef<WebSocket | null>(null);
 
   const sendStart = () => {
     socketRef.current?.send(JSON.stringify({ type: 'start' }));
+  };
+
+  const sendAddBot = () => {
+    socketRef.current?.send(JSON.stringify({ type: 'addBot' }));
+  };
+
+  const sendSetName = () => {
+    socketRef.current?.send(JSON.stringify({ type: 'setName', name }));
   };
 
   useEffect(() => {
@@ -74,6 +83,14 @@ function App() {
     return (
       <div className="game">
         <p>Warte auf Mitspieler: {waitingCount} verbunden</p>
+        <input
+          type="text"
+          placeholder="Dein Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={sendSetName}
+        />
+        <button onClick={sendAddBot}>Bot hinzufügen</button>
         <button onClick={sendStart}>Spiel starten</button>
       </div>
     );
