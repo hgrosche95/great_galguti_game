@@ -1,5 +1,5 @@
 import { WebSocketServer, type WebSocket } from 'ws';
-import { Player } from '../../src/players';
+import { nextActivePlayer, Player } from '../../src/players';
 import { shuffle } from '../../src/general';
 import { createDeck, handOutDeck } from '../../src/deck';
 import { createTrickState, isTrickOver, move, startNewTrick } from '../../src/trick';
@@ -15,6 +15,27 @@ let players: Player[] = [];
 let trickState: ReturnType<typeof createTrickState> | null = null;
 let nextPlayerId = 1;
 let finishOrder: number[] = [];
+
+function isConnected(playerId: number): boolean {
+  return connections.some(conn => conn.playerId === playerId);
+}
+
+function reapplyDisconnected() {
+  for (const player of players) {
+    if (!isConnected(player.id)) {
+      player.isActive = false;
+    }
+  }
+}
+
+function skipDisconnectedPlayers() {
+  if (!trickState) return;
+  for (let i = 0; i < players.length && !isConnected(trickState.currentPlayerId); i++) {
+    const next = nextActivePlayer(players, trickState.currentPlayerId);
+    if (!next) break; // niemand mehr verbunden/aktiv
+    trickState.currentPlayerId = next.id;
+  }
+}
 
 function recordFinishers() {
   const newlyFinished = players
@@ -56,6 +77,8 @@ socket.on('message', (raw) => {
       trickState = result;
       if (isTrickOver(players)) {
         trickState = startNewTrick(players, trickState);
+        reapplyDisconnected();
+        skipDisconnectedPlayers();
       }
       recordFinishers();
       broadcastGameState();
@@ -66,6 +89,15 @@ socket.on('message', (raw) => {
   socket.on('close', () => {
     connections = connections.filter(conn => conn.socket !== socket);
     broadcastWaitingCount();
+
+    if (trickState) {
+      const disconnectedPlayer = players.find(p => p.id === playerId);
+      if (disconnectedPlayer) {
+        disconnectedPlayer.isActive = false;
+        skipDisconnectedPlayers();
+        broadcastGameState();
+      }
+    }
   });
 });
 
