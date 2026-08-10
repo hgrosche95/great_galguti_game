@@ -46,7 +46,10 @@ function App() {
   };
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8080');
+    const wsUrl = import.meta.env.DEV
+      ? 'ws://localhost:8080'
+      : 'wss://great-galguti-server.redisland-e7c19e60.germanywestcentral.azurecontainerapps.io';
+    const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
 
     ws.onmessage = (event) => {
