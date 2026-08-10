@@ -1,23 +1,25 @@
 import { WebSocketServer, type WebSocket } from 'ws';
-import { nextActivePlayer, Player } from '../../src/players';
+import { nextActivePlayer, type Player } from '../../src/players';
 import { shuffle } from '../../src/general';
 import { createDeck, handOutDeck } from '../../src/deck';
-import { createTrickState, isTrickOver, move, startNewTrick } from '../../src/trick';
-import { Card } from '../../src/cards';
+import { createTrickState, isTrickOver, move, chooseMove, startNewTrick } from '../../src/trick';
+import type { Card } from '../../src/cards';
 
 interface Connection {
   socket: WebSocket;
   playerId: number;
+  name: string;
 }
 
 let connections: Connection[] = [];
+let bots: number[] = [];
 let players: Player[] = [];
 let trickState: ReturnType<typeof createTrickState> | null = null;
 let nextPlayerId = 1;
 let finishOrder: number[] = [];
 
 function isConnected(playerId: number): boolean {
-  return connections.some(conn => conn.playerId === playerId);
+  return connections.some(conn => conn.playerId === playerId) || bots.includes(playerId);
 }
 
 function reapplyDisconnected() {
@@ -45,46 +47,49 @@ function recordFinishers() {
 }
 
 function broadcastWaitingCount() {
-  const message = JSON.stringify({ type: 'waiting', count: connections.length });
+  const message = JSON.stringify({
+    type: 'waiting',
+    count: connections.length + bots.length,
+    bots: bots.length,
+  });
   connections.forEach(conn => conn.socket.send(message));
 }
 
 const wss = new WebSocketServer({ port: 8080 });
 
 wss.on('connection', (socket) => {
-  if(connections.length >= 8) {
+  if (connections.length + bots.length >= 8) {
     socket.close();
     return;
   }
 
   const playerId = nextPlayerId++;
-  const connection: Connection = { socket, playerId };
+  const connection: Connection = { socket, playerId, name: `Player ${playerId}` };
   connections.push(connection);
 
   broadcastWaitingCount();
 
-socket.on('message', (raw) => {
-  const data = JSON.parse(raw.toString());
-  if (data.type === 'start' && connections.length >= 3) {
-    startGame();
-  } else if (data.type === 'move' && trickState) {
-    const me = players.find(p => p.id === playerId)!;
-    const cards = resolveCardsFromHand(me.hand, data.cards);
-    if (!cards) return; // Spieler behauptet, Karten zu haben, die er nicht hat
-
-    const result = move(players, playerId, cards, trickState);
-    if (result !== false) {
-      trickState = result;
-      if (isTrickOver(players)) {
-        trickState = startNewTrick(players, trickState);
-        reapplyDisconnected();
-        skipDisconnectedPlayers();
+  socket.on('message', (raw) => {
+    const data = JSON.parse(raw.toString());
+    if (data.type === 'setName' && !trickState && typeof data.name === 'string') {
+      const connection = connections.find(conn => conn.socket === socket);
+      const trimmedName = data.name.trim().slice(0, 20);
+      if (connection && trimmedName) {
+        connection.name = trimmedName;
       }
-      recordFinishers();
-      broadcastGameState();
+    } else if (data.type === 'addBot' && !trickState && connections.length + bots.length < 8) {
+      bots.push(nextPlayerId++);
+      broadcastWaitingCount();
+    } else if (data.type === 'start' && connections.length + bots.length >= 3) {
+      startGame();
+    } else if (data.type === 'move' && trickState) {
+      const me = players.find(p => p.id === playerId)!;
+      const cards = resolveCardsFromHand(me.hand, data.cards);
+      if (!cards) return; // Spieler behauptet, Karten zu haben, die er nicht hat
+
+      processMove(playerId, cards);
     }
-  }
-});
+  });
 
   socket.on('close', () => {
     connections = connections.filter(conn => conn.socket !== socket);
@@ -104,12 +109,20 @@ socket.on('message', (raw) => {
 function startGame() {
   finishOrder = [];
 
-  players = connections.map(conn => ({
-    id: conn.playerId,
-    name: `Player ${conn.playerId}`,
-    hand: [],
-    isActive: true,
-  }));
+  players = [
+    ...connections.map(conn => ({
+      id: conn.playerId,
+      name: conn.name,
+      hand: [],
+      isActive: true,
+    })),
+    ...bots.map(botId => ({
+      id: botId,
+      name: `Bot ${botId}`,
+      hand: [],
+      isActive: true,
+    })),
+  ];
 
   const deck = shuffle(createDeck());
   const hands = handOutDeck(deck, players.length);
@@ -119,6 +132,7 @@ function startGame() {
 
   trickState = createTrickState(players[0]!.id);
   broadcastGameState();
+  maybePlayBotTurn();
 }
 
 function resolveCardsFromHand(hand: Card[], requested: { value: number; isJoker: boolean }[]): Card[] | null {
@@ -133,6 +147,41 @@ function resolveCardsFromHand(hand: Card[], requested: { value: number; isJoker:
     remaining.splice(index, 1);
   }
   return resolved;
+}
+
+// Verarbeitet einen Zug (Karten spielen oder passen), egal ob er von einem
+// echten Spieler oder einem Bot kommt.
+function processMove(playerId: number, cards: Card[]): boolean {
+  if (!trickState) return false;
+
+  const result = move(players, playerId, cards, trickState);
+  if (result === false) return false;
+
+  trickState = result;
+  if (isTrickOver(players)) {
+    trickState = startNewTrick(players, trickState);
+    reapplyDisconnected();
+    skipDisconnectedPlayers();
+  }
+  recordFinishers();
+  broadcastGameState();
+  maybePlayBotTurn();
+  return true;
+}
+
+function maybePlayBotTurn() {
+  if (!trickState) return;
+  const currentPlayerId = trickState.currentPlayerId;
+  if (!bots.includes(currentPlayerId)) return;
+
+  setTimeout(() => {
+    // Falls sich der Zustand zwischenzeitlich geaendert hat (z.B. Spielende), abbrechen.
+    if (!trickState || trickState.currentPlayerId !== currentPlayerId) return;
+
+    const bot = players.find(p => p.id === currentPlayerId)!;
+    const cards = chooseMove(bot, trickState.lastMove);
+    processMove(currentPlayerId, cards);
+  }, 800);
 }
 
 function broadcastGameState() {
