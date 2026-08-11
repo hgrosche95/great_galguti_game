@@ -12,10 +12,11 @@ Ein rundenbasiertes Kartenspiel nach Stichspiel-Logik für 3–8 Spieler, geschr
 
 ## Projektstruktur
 
-Das Projekt besteht aus zwei eigenständigen npm-Projekten:
+Das Projekt besteht aus drei eigenständigen npm-Projekten:
 
 - **`src/`** – die Kern-Spiellogik (Karten, Deck, Spieler, Regeln, Stichrunden, ein einfacher Bot), reines TypeScript/Node, getestet mit Vitest.
-- **`web/`** – eine spielbare Web-Oberfläche (React + Vite), die die Logik aus `src/` direkt einbindet (per relativem Import), gegen 3 einfache Bots im Browser.
+- **`server/`** – ein WebSocket-Server (Node, `ws`), der ein einzelnes, echtes Mehrspieler-Spiel verwaltet (Warteraum, mehrere echte Clients, optional Bots, Verbindungsabbrüche) und dabei die Logik aus `src/` direkt wiederverwendet.
+- **`web/`** – die spielbare Web-Oberfläche (React + Vite), die sich per WebSocket mit `server/` verbindet.
 
 ### Kernlogik (`src/`)
 
@@ -36,6 +37,18 @@ Implementiert:
 
 Alle Module sind mit Vitest-Tests abgedeckt.
 
+### Server (`server/`)
+
+```bash
+cd server
+npm install
+npm run dev        # tsx src/index.ts, WebSocket-Server auf ws://localhost:8080
+npm run typecheck  # tsc --noEmit
+npm run build      # esbuild-Bundle nach dist/index.js (fuer Deployment)
+```
+
+Verwaltet einen einzigen laufenden Warteraum/Partie: Spieler verbinden sich, können optional Bots hinzufügen und ihren Namen wählen, jemand startet die Partie. Danach validiert der Server jeden Zug über `move()` aus `src/` und schickt jedem Client nur seine eigene Hand plus die Kartenanzahl der anderen (siehe Sichtbarkeitsregel in den Spielregeln). Verbindungsabbrüche mitten im Spiel werden abgefangen (betroffener Spieler wird übersprungen, Bots übernehmen nie unabsichtlich dessen Zug).
+
 ### Web-UI (`web/`)
 
 ```bash
@@ -45,16 +58,19 @@ npm run dev     # Dev-Server mit Hot Reload, meist http://localhost:5173
 npm run build   # Typprüfung (tsc -b) + Produktions-Build
 ```
 
-Zeigt deine eigene Hand (nach Wert sortiert und gruppiert, spielbare Karten hervorgehoben), die Kartenanzahl der Mitspieler, den aktuellen Stich, das Spielende samt Rangliste und lässt dich gegen 3 automatisch spielende Bots antreten.
+Warteraum (Mitspieler-Anzahl, eigener Name, Bots hinzufügen, Spiel starten) und die eigentliche Partie: eigene Hand (sortiert/gruppiert, spielbare Karten hervorgehoben), Kartenanzahl der Mitspieler, aktueller Stich, Spielende samt Rangliste. Verbindet sich per WebSocket mit `server/` — lokal mit `ws://localhost:8080`, im Produktions-Build automatisch mit der echten Server-Adresse.
 
 ## Live-Deployment
 
-Die Web-UI ist unter **https://blue-sea-08b19cb0f.7.azurestaticapps.net** erreichbar (Azure Static Web Apps, Free-Tier). Jeder Push auf `main` deployed automatisch neu (siehe `.github/workflows/azure-static-web-apps.yml`); jeder Pull Request bekommt zusätzlich eine eigene Vorschau-Umgebung.
+- **Web-UI**: https://blue-sea-08b19cb0f.7.azurestaticapps.net (Azure Static Web Apps, Free-Tier). Jeder Push auf `main` deployed automatisch neu (`.github/workflows/azure-static-web-apps.yml`); jeder Pull Request bekommt zusätzlich eine eigene Vorschau-Umgebung.
+- **Server**: läuft als Container auf Azure Container Apps (Image via `server/Dockerfile`, gebaut mit esbuild, in der GitHub Container Registry veröffentlicht). Anders als die Web-UI wird der Server aktuell **nicht** automatisch bei jedem Push neu deployed — ein neues Image muss manuell gebaut, gepusht und in Azure aktualisiert werden.
+
+Zusammen ergibt das ein öffentlich erreichbares Online-Spiel — mehrere echte Spieler von unterschiedlichen Orten können gemeinsam eine Partie spielen.
 
 ## Mitentwickeln
 
-Der `main`-Branch ist geschützt: Änderungen laufen über einen eigenen Branch + Pull Request, der erst gemerged werden kann, wenn die CI-Pipeline grün ist — Typprüfung + Tests aus `src/` (`test`-Check) und Build/Typprüfung von `web/` (`web`-Check), siehe `.github/workflows/ci.yml`.
+Der `main`-Branch ist geschützt: Änderungen laufen über einen eigenen Branch + Pull Request, der erst gemerged werden kann, wenn die CI-Pipeline grün ist — Typprüfung + Tests aus `src/` (`test`), Build/Typprüfung von `web/` (`web`) und Typprüfung von `server/` (`server`), siehe `.github/workflows/ci.yml`.
 
 ## Geplant
 
-- Echtes Online-Multiplayer: ein Server (WebSockets, Spielräume, mehrere echte Clients statt Bots)
+- Automatisches Server-Deployment bei Codeänderungen (aktuell manueller Docker-Build + Push + Azure-Update)
