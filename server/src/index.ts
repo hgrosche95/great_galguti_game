@@ -1,9 +1,12 @@
+import http from 'http';
+import express from 'express';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { nextActivePlayer, type Player } from '../../src/players';
 import { shuffle } from '../../src/general';
 import { createDeck, handOutDeck } from '../../src/deck';
 import { createTrickState, isTrickOver, move, chooseMove, startNewTrick } from '../../src/trick';
 import type { Card } from '../../src/cards';
+import { authRouter } from './auth/routes';
 
 interface Connection {
   socket: WebSocket;
@@ -55,7 +58,12 @@ function broadcastWaitingCount() {
   connections.forEach(conn => conn.socket.send(message));
 }
 
-const wss = new WebSocketServer({ port: 8080 });
+const app = express();
+app.use(express.json());
+app.use('/auth', authRouter);
+
+const httpServer = http.createServer(app);
+const wss = new WebSocketServer({ server: httpServer });
 
 wss.on('connection', (socket) => {
   if (connections.length + bots.length >= 8) {
@@ -213,4 +221,6 @@ function broadcastGameState() {
   }
 }
 
-console.log('WebSocket-Server läuft auf ws://localhost:8080');
+httpServer.listen(8080, () => {
+  console.log('Server (HTTP + WebSocket) läuft auf http://localhost:8080');
+});

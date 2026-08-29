@@ -1,0 +1,63 @@
+import { Router } from 'express';
+import { createUser, findUserByEmail, findUserByUsername } from './user';
+import { hashPassword, verifyPassword } from './password';
+
+export const authRouter = Router();
+
+// Fester Dummy-Hash, gegen den wir vergleichen, wenn ein Login mit
+// unbekannter E-Mail versucht wird. So dauert ein Login-Versuch mit
+// existierender und mit nicht-existierender E-Mail gleich lang - sonst
+// koennte man ueber die Antwortzeit erraten, welche E-Mails registriert sind.
+let dummyHashPromise: Promise<string> | null = null;
+function getDummyHash(): Promise<string> {
+  if (!dummyHashPromise) {
+    dummyHashPromise = hashPassword('dummy-password-for-timing-safety');
+  }
+  return dummyHashPromise;
+}
+
+authRouter.post('/register', async (req, res) => {
+  const { username, email, password } = req.body ?? {};
+
+  if (typeof username !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+    res.status(400).json({ error: 'username, email und password sind erforderlich' });
+    return;
+  }
+
+  const trimmedUsername = username.trim();
+  if (trimmedUsername.length < 3 || password.length < 8) {
+    res.status(400).json({ error: 'username muss mindestens 3, password mindestens 8 Zeichen haben' });
+    return;
+  }
+
+  if (findUserByEmail(email) || findUserByUsername(trimmedUsername)) {
+    res.status(409).json({ error: 'username oder email bereits vergeben' });
+    return;
+  }
+
+  const passwordHash = await hashPassword(password);
+  const user = createUser(trimmedUsername, email, passwordHash);
+
+  res.status(201).json({ id: user.id, username: user.username, email: user.email });
+});
+
+authRouter.post('/login', async (req, res) => {
+  const { email, password } = req.body ?? {};
+
+  if (typeof email !== 'string' || typeof password !== 'string') {
+    res.status(400).json({ error: 'email und password sind erforderlich' });
+    return;
+  }
+
+  const user = findUserByEmail(email);
+  const hashToCheck = user ? user.passwordHash : await getDummyHash();
+  const passwordValid = await verifyPassword(password, hashToCheck);
+
+  if (!user || !passwordValid) {
+    res.status(401).json({ error: 'email oder password falsch' });
+    return;
+  }
+
+  // TODO (Schritt 4): Access-/Refresh-Token statt Nutzerobjekt zurueckgeben
+  res.status(200).json({ id: user.id, username: user.username, email: user.email });
+});
