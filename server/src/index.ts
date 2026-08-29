@@ -266,6 +266,13 @@ function broadcastGameState() {
   }
 }
 
-httpServer.listen(8080, () => {
-  console.log('Server (HTTP + WebSocket) läuft auf http://localhost:8080');
-});
+export { httpServer };
+
+// Nur beim direkten Start (node index.js) lauschen, nicht wenn dieses
+// Modul von einem Test importiert wird (der startet den Server selbst
+// auf einem freien Port).
+if (require.main === module) {
+  httpServer.listen(8080, () => {
+    console.log('Server (HTTP + WebSocket) läuft auf http://localhost:8080');
+  });
+}
