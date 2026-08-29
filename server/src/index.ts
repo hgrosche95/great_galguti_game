@@ -1,5 +1,6 @@
 import http from 'http';
 import express from 'express';
+import cors from 'cors';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { nextActivePlayer, type Player } from '../../src/players';
 import { shuffle } from '../../src/general';
@@ -68,7 +69,21 @@ function isValidAccessToken(token: string): boolean {
   }
 }
 
+// Erlaubt: lokaler Vite-Dev-Server sowie die Azure Static Web Apps-Domain
+// (Produktion und PR-Vorschau-Umgebungen laufen beide unter *.azurestaticapps.net).
+const ALLOWED_ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+\.azurestaticapps\.net$/;
+
 const app = express();
+app.use(cors({
+  origin: (origin, callback) => {
+    // kein Origin-Header = kein Browser (curl, Server-zu-Server) -> erlauben
+    if (!origin || origin === 'http://localhost:5173' || ALLOWED_ORIGIN_PATTERN.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Nicht erlaubte Origin'));
+    }
+  },
+}));
 app.use(express.json());
 app.use('/auth', authRouter);
 
