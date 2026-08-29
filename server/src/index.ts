@@ -7,6 +7,7 @@ import { createDeck, handOutDeck } from '../../src/deck';
 import { createTrickState, isTrickOver, move, chooseMove, startNewTrick } from '../../src/trick';
 import type { Card } from '../../src/cards';
 import { authRouter } from './auth/routes';
+import { verifyAccessToken } from './auth/jwt';
 
 interface Connection {
   socket: WebSocket;
@@ -58,6 +59,15 @@ function broadcastWaitingCount() {
   connections.forEach(conn => conn.socket.send(message));
 }
 
+function isValidAccessToken(token: string): boolean {
+  try {
+    verifyAccessToken(token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const app = express();
 app.use(express.json());
 app.use('/auth', authRouter);
@@ -66,19 +76,36 @@ const httpServer = http.createServer(app);
 const wss = new WebSocketServer({ server: httpServer });
 
 wss.on('connection', (socket) => {
-  if (connections.length + bots.length >= 8) {
-    socket.close();
-    return;
-  }
+  let authed = false;
+  let playerId = 0;
 
-  const playerId = nextPlayerId++;
-  const connection: Connection = { socket, playerId, name: `Player ${playerId}` };
-  connections.push(connection);
-
-  broadcastWaitingCount();
+  // Client muss sich innerhalb von 5s per {type:'auth', token} authentifizieren,
+  // sonst wird die Verbindung verworfen (verhindert offene, nie-authentifizierte Sockets).
+  const authTimeout = setTimeout(() => {
+    if (!authed) socket.close();
+  }, 5000);
 
   socket.on('message', (raw) => {
     const data = JSON.parse(raw.toString());
+
+    if (!authed) {
+      if (data.type !== 'auth' || typeof data.token !== 'string' || !isValidAccessToken(data.token)) {
+        socket.close();
+        return;
+      }
+      if (connections.length + bots.length >= 8) {
+        socket.close();
+        return;
+      }
+
+      authed = true;
+      clearTimeout(authTimeout);
+      playerId = nextPlayerId++;
+      connections.push({ socket, playerId, name: `Player ${playerId}` });
+      broadcastWaitingCount();
+      return;
+    }
+
     if (data.type === 'setName' && !trickState && typeof data.name === 'string') {
       const connection = connections.find(conn => conn.socket === socket);
       const trimmedName = data.name.trim().slice(0, 20);
@@ -100,6 +127,9 @@ wss.on('connection', (socket) => {
   });
 
   socket.on('close', () => {
+    clearTimeout(authTimeout);
+    if (!authed) return;
+
     connections = connections.filter(conn => conn.socket !== socket);
     broadcastWaitingCount();
 
