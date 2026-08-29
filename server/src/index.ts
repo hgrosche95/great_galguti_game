@@ -1,9 +1,14 @@
+import http from 'http';
+import express from 'express';
+import cors from 'cors';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { nextActivePlayer, type Player } from '../../src/players';
 import { shuffle } from '../../src/general';
 import { createDeck, handOutDeck } from '../../src/deck';
 import { createTrickState, isTrickOver, move, chooseMove, startNewTrick } from '../../src/trick';
 import type { Card } from '../../src/cards';
+import { authRouter } from './auth/routes';
+import { verifyAccessToken } from './auth/jwt';
 
 interface Connection {
   socket: WebSocket;
@@ -55,22 +60,67 @@ function broadcastWaitingCount() {
   connections.forEach(conn => conn.socket.send(message));
 }
 
-const wss = new WebSocketServer({ port: 8080 });
+function isValidAccessToken(token: string): boolean {
+  try {
+    verifyAccessToken(token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Erlaubt: lokaler Vite-Dev-Server sowie die Azure Static Web Apps-Domain
+// (Produktion und PR-Vorschau-Umgebungen laufen beide unter *.azurestaticapps.net).
+const ALLOWED_ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+\.azurestaticapps\.net$/;
+
+const app = express();
+app.use(cors({
+  origin: (origin, callback) => {
+    // kein Origin-Header = kein Browser (curl, Server-zu-Server) -> erlauben
+    if (!origin || origin === 'http://localhost:5173' || ALLOWED_ORIGIN_PATTERN.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Nicht erlaubte Origin'));
+    }
+  },
+}));
+app.use(express.json());
+app.use('/auth', authRouter);
+
+const httpServer = http.createServer(app);
+const wss = new WebSocketServer({ server: httpServer });
 
 wss.on('connection', (socket) => {
-  if (connections.length + bots.length >= 8) {
-    socket.close();
-    return;
-  }
+  let authed = false;
+  let playerId = 0;
 
-  const playerId = nextPlayerId++;
-  const connection: Connection = { socket, playerId, name: `Player ${playerId}` };
-  connections.push(connection);
-
-  broadcastWaitingCount();
+  // Client muss sich innerhalb von 5s per {type:'auth', token} authentifizieren,
+  // sonst wird die Verbindung verworfen (verhindert offene, nie-authentifizierte Sockets).
+  const authTimeout = setTimeout(() => {
+    if (!authed) socket.close();
+  }, 5000);
 
   socket.on('message', (raw) => {
     const data = JSON.parse(raw.toString());
+
+    if (!authed) {
+      if (data.type !== 'auth' || typeof data.token !== 'string' || !isValidAccessToken(data.token)) {
+        socket.close();
+        return;
+      }
+      if (connections.length + bots.length >= 8) {
+        socket.close();
+        return;
+      }
+
+      authed = true;
+      clearTimeout(authTimeout);
+      playerId = nextPlayerId++;
+      connections.push({ socket, playerId, name: `Player ${playerId}` });
+      broadcastWaitingCount();
+      return;
+    }
+
     if (data.type === 'setName' && !trickState && typeof data.name === 'string') {
       const connection = connections.find(conn => conn.socket === socket);
       const trimmedName = data.name.trim().slice(0, 20);
@@ -92,6 +142,9 @@ wss.on('connection', (socket) => {
   });
 
   socket.on('close', () => {
+    clearTimeout(authTimeout);
+    if (!authed) return;
+
     connections = connections.filter(conn => conn.socket !== socket);
     broadcastWaitingCount();
 
@@ -213,4 +266,13 @@ function broadcastGameState() {
   }
 }
 
-console.log('WebSocket-Server läuft auf ws://localhost:8080');
+export { httpServer };
+
+// Nur beim direkten Start (node index.js) lauschen, nicht wenn dieses
+// Modul von einem Test importiert wird (der startet den Server selbst
+// auf einem freien Port).
+if (require.main === module) {
+  httpServer.listen(8080, () => {
+    console.log('Server (HTTP + WebSocket) läuft auf http://localhost:8080');
+  });
+}

@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { getMoveValue } from '../../src/rules';
 import type { Card } from '../../src/cards';
+import LoginScreen from './LoginScreen';
 import './App.css';
+
+const SERVER_HOST = import.meta.env.DEV
+  ? 'localhost:8080'
+  : 'great-galguti-server.redisland-e7c19e60.germanywestcentral.azurecontainerapps.io';
+const WS_URL = `${import.meta.env.DEV ? 'ws' : 'wss'}://${SERVER_HOST}`;
+const API_URL = `${import.meta.env.DEV ? 'http' : 'https'}://${SERVER_HOST}`;
 
 interface ServerPlayer {
   id: number;
@@ -26,6 +33,7 @@ function CardFace({ card }: { card: Card }) {
 }
 
 function App() {
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
   const [waitingCount, setWaitingCount] = useState(0);
   const [serverState, setServerState] = useState<ServerState | null>(null);
@@ -46,11 +54,14 @@ function App() {
   };
 
   useEffect(() => {
-    const wsUrl = import.meta.env.DEV
-      ? 'ws://localhost:8080'
-      : 'wss://great-galguti-server.redisland-e7c19e60.germanywestcentral.azurecontainerapps.io';
-    const ws = new WebSocket(wsUrl);
+    if (!accessToken) return;
+
+    const ws = new WebSocket(WS_URL);
     socketRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'auth', token: accessToken }));
+    };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -64,7 +75,7 @@ function App() {
     return () => {
       ws.close();
     };
-  }, []);
+  }, [accessToken]);
 
   const selectCard = (card: Card) => {
     if (selectedCards.includes(card)) {
@@ -81,6 +92,10 @@ function App() {
     }));
     setSelectedCards([]);
   };
+
+  if (!accessToken) {
+    return <LoginScreen apiUrl={API_URL} onAuthenticated={setAccessToken} />;
+  }
 
   if (!serverState) {
     return (
