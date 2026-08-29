@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createUser, findUserByEmail, findUserById, findUserByUsername, type User } from './user';
 import { hashPassword, verifyPassword } from './password';
 import { createAccessToken, createRefreshToken, verifyRefreshToken } from './jwt';
+import { requireAuth, type AuthenticatedRequest } from './middleware';
 
 export const authRouter = Router();
 
@@ -89,4 +90,9 @@ authRouter.post('/refresh', (req, res) => {
   } catch {
     res.status(401).json({ error: 'refreshToken ungueltig oder abgelaufen' });
   }
+});
+
+authRouter.get('/me', requireAuth, (req, res) => {
+  const { userId, username } = req as AuthenticatedRequest;
+  res.status(200).json({ id: userId, username });
 });
