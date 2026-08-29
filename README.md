@@ -15,8 +15,8 @@ Ein rundenbasiertes Kartenspiel nach Stichspiel-Logik für 3–8 Spieler, geschr
 Das Projekt besteht aus drei eigenständigen npm-Projekten:
 
 - **`src/`** – die Kern-Spiellogik (Karten, Deck, Spieler, Regeln, Stichrunden, ein einfacher Bot), reines TypeScript/Node, getestet mit Vitest.
-- **`server/`** – ein WebSocket-Server (Node, `ws`), der ein einzelnes, echtes Mehrspieler-Spiel verwaltet (Warteraum, mehrere echte Clients, optional Bots, Verbindungsabbrüche) und dabei die Logik aus `src/` direkt wiederverwendet.
-- **`web/`** – die spielbare Web-Oberfläche (React + Vite), die sich per WebSocket mit `server/` verbindet.
+- **`server/`** – ein HTTP-/WebSocket-Server (Node, Express, `ws`), der Nutzerkonten mit JWT-Authentifizierung (siehe [Authentifizierung](#authentifizierung)) und ein einzelnes, echtes Mehrspieler-Spiel verwaltet (Warteraum, mehrere echte Clients, optional Bots, Verbindungsabbrüche) und dabei die Logik aus `src/` direkt wiederverwendet.
+- **`web/`** – die spielbare Web-Oberfläche (React + Vite), mit Login/Registrierung und Verbindung per WebSocket zu `server/`.
 
 ### Kernlogik (`src/`)
 
@@ -42,12 +42,13 @@ Alle Module sind mit Vitest-Tests abgedeckt.
 ```bash
 cd server
 npm install
-npm run dev        # tsx src/index.ts, WebSocket-Server auf ws://localhost:8080
+npm run dev        # tsx src/index.ts, HTTP-/WebSocket-Server auf http://localhost:8080
+npm test           # Unit- und E2E-Tests mit Vitest ausführen
 npm run typecheck  # tsc --noEmit
 npm run build      # esbuild-Bundle nach dist/index.js (fuer Deployment)
 ```
 
-Verwaltet einen einzigen laufenden Warteraum/Partie: Spieler verbinden sich, können optional Bots hinzufügen und ihren Namen wählen, jemand startet die Partie. Danach validiert der Server jeden Zug über `move()` aus `src/` und schickt jedem Client nur seine eigene Hand plus die Kartenanzahl der anderen (siehe Sichtbarkeitsregel in den Spielregeln). Verbindungsabbrüche mitten im Spiel werden abgefangen (betroffener Spieler wird übersprungen, Bots übernehmen nie unabsichtlich dessen Zug).
+Verwaltet Nutzerkonten (Registrierung/Login, siehe [Authentifizierung](#authentifizierung)) sowie einen einzigen laufenden Warteraum/Partie: Spieler verbinden sich per WebSocket mit gültigem Access-Token, können optional Bots hinzufügen und ihren Namen wählen, jemand startet die Partie. Danach validiert der Server jeden Zug über `move()` aus `src/` und schickt jedem Client nur seine eigene Hand plus die Kartenanzahl der anderen (siehe Sichtbarkeitsregel in den Spielregeln). Verbindungsabbrüche mitten im Spiel werden abgefangen (betroffener Spieler wird übersprungen, Bots übernehmen nie unabsichtlich dessen Zug).
 
 ### Web-UI (`web/`)
 
@@ -58,7 +59,24 @@ npm run dev     # Dev-Server mit Hot Reload, meist http://localhost:5173
 npm run build   # Typprüfung (tsc -b) + Produktions-Build
 ```
 
-Warteraum (Mitspieler-Anzahl, eigener Name, Bots hinzufügen, Spiel starten) und die eigentliche Partie: eigene Hand (sortiert/gruppiert, spielbare Karten hervorgehoben), Kartenanzahl der Mitspieler, aktueller Stich, Spielende samt Rangliste. Verbindet sich per WebSocket mit `server/` — lokal mit `ws://localhost:8080`, im Produktions-Build automatisch mit der echten Server-Adresse.
+Vor dem Warteraum steht ein Login/Registrieren-Formular; erst mit dem dabei erhaltenen Access-Token baut der Client die WebSocket-Verbindung zu `server/` auf. Danach: Warteraum (Mitspieler-Anzahl, eigener Name, Bots hinzufügen, Spiel starten) und die eigentliche Partie: eigene Hand (sortiert/gruppiert, spielbare Karten hervorgehoben), Kartenanzahl der Mitspieler, aktueller Stich, Spielende samt Rangliste. Verbindet sich lokal mit `http(s)://localhost:8080`, im Produktions-Build automatisch mit der echten Server-Adresse.
+
+## Authentifizierung
+
+Der Server verwaltet Nutzerkonten mit JWT-Authentifizierung (aktuell In-Memory, siehe [Geplant](#geplant)):
+
+| Endpoint             | Methode | Body                                | Antwort                                              |
+| --------------------- | ------- | ------------------------------------ | ----------------------------------------------------- |
+| `/auth/register`      | POST    | `{ username, email, password }`      | `201` mit `{ id, username, email, accessToken, refreshToken }` |
+| `/auth/login`         | POST    | `{ email, password }`                | `200` mit `{ id, username, email, accessToken, refreshToken }` |
+| `/auth/refresh`       | POST    | `{ refreshToken }`                   | `200` mit `{ accessToken }`                            |
+| `/auth/me`            | GET     | – (Header `Authorization: Bearer <accessToken>`) | `200` mit `{ id, username }`             |
+
+Passwörter werden nie im Klartext gespeichert (Hashing mit `bcryptjs`). Das **Access-Token** ist 15 Minuten gültig und wird bei jeder geschützten Anfrage mitgeschickt; das **Refresh-Token** ist 7 Tage gültig und wird ausschließlich benutzt, um über `/auth/refresh` ein neues Access-Token zu bekommen, ohne dass sich der Nutzer erneut einloggen muss. Beide Tokens sind mit unterschiedlichen Server-Secrets signiert und dadurch nicht gegeneinander austauschbar.
+
+**WebSocket-Beitritt:** Da der Browser beim WebSocket-Verbindungsaufbau keine eigenen Header erlaubt, läuft die Authentifizierung über die erste Nachricht im bestehenden Nachrichtenprotokoll: der Client muss direkt nach dem Verbinden `{ "type": "auth", "token": "<accessToken>" }` senden. Ohne gültiges Token (oder ganz ohne Nachricht innerhalb von 5 Sekunden) trennt der Server die Verbindung, bevor der Client als Spieler aufgenommen wird.
+
+In Produktion müssen `JWT_ACCESS_SECRET` und `JWT_REFRESH_SECRET` als Umgebungsvariablen gesetzt werden (z. B. als Azure Container App-Secrets) — ohne sie greifen bewusst leicht als unsicher erkennbare Entwicklungs-Fallbacks aus `server/src/auth/jwt.ts`.
 
 ## Live-Deployment
 
@@ -69,8 +87,10 @@ Zusammen ergibt das ein öffentlich erreichbares Online-Spiel — mehrere echte 
 
 ## Mitentwickeln
 
-Der `main`-Branch ist geschützt: Änderungen laufen über einen eigenen Branch + Pull Request, der erst gemerged werden kann, wenn die CI-Pipeline grün ist — Typprüfung + Tests aus `src/` (`test`), Build/Typprüfung von `web/` (`web`) und Typprüfung von `server/` (`server`), siehe `.github/workflows/ci.yml`.
+Der `main`-Branch ist geschützt: Änderungen laufen über einen eigenen Branch + Pull Request, der erst gemerged werden kann, wenn die CI-Pipeline grün ist — Typprüfung + Tests aus `src/` (`test`), Build/Typprüfung von `web/` (`web`) und Typprüfung + Tests von `server/` (`server`), siehe `.github/workflows/ci.yml`.
 
 ## Geplant
 
 - Automatisches Server-Deployment bei Codeänderungen (aktuell manueller Docker-Build + Push + Azure-Update)
+- Echte Persistenz für Nutzerkonten (aktuell In-Memory, geht bei jedem Server-Neustart verloren) und eine Sperrliste für Refresh-Tokens (aktuell zustandslos, kein echtes Logout/Revoke)
+- Weitere Schritte Richtung Microservices: eigener Lobby-Service (Go), GraphQL-Gateway, RabbitMQ, Kubernetes-Deployment
