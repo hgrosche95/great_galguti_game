@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { createUser, findUserByEmail, findUserByUsername } from './user';
+import { createUser, findUserByEmail, findUserById, findUserByUsername, type User } from './user';
 import { hashPassword, verifyPassword } from './password';
+import { createAccessToken, createRefreshToken, verifyRefreshToken } from './jwt';
 
 export const authRouter = Router();
 
@@ -14,6 +15,13 @@ function getDummyHash(): Promise<string> {
     dummyHashPromise = hashPassword('dummy-password-for-timing-safety');
   }
   return dummyHashPromise;
+}
+
+function issueTokens(user: User) {
+  return {
+    accessToken: createAccessToken({ sub: user.id, username: user.username }),
+    refreshToken: createRefreshToken({ sub: user.id }),
+  };
 }
 
 authRouter.post('/register', async (req, res) => {
@@ -38,7 +46,7 @@ authRouter.post('/register', async (req, res) => {
   const passwordHash = await hashPassword(password);
   const user = createUser(trimmedUsername, email, passwordHash);
 
-  res.status(201).json({ id: user.id, username: user.username, email: user.email });
+  res.status(201).json({ id: user.id, username: user.username, email: user.email, ...issueTokens(user) });
 });
 
 authRouter.post('/login', async (req, res) => {
@@ -58,6 +66,27 @@ authRouter.post('/login', async (req, res) => {
     return;
   }
 
-  // TODO (Schritt 4): Access-/Refresh-Token statt Nutzerobjekt zurueckgeben
-  res.status(200).json({ id: user.id, username: user.username, email: user.email });
+  res.status(200).json({ id: user.id, username: user.username, email: user.email, ...issueTokens(user) });
+});
+
+authRouter.post('/refresh', (req, res) => {
+  const { refreshToken } = req.body ?? {};
+
+  if (typeof refreshToken !== 'string') {
+    res.status(400).json({ error: 'refreshToken ist erforderlich' });
+    return;
+  }
+
+  try {
+    const payload = verifyRefreshToken(refreshToken);
+    const user = findUserById(payload.sub);
+    if (!user) {
+      res.status(401).json({ error: 'refreshToken ungueltig oder abgelaufen' });
+      return;
+    }
+
+    res.status(200).json({ accessToken: createAccessToken({ sub: user.id, username: user.username }) });
+  } catch {
+    res.status(401).json({ error: 'refreshToken ungueltig oder abgelaufen' });
+  }
 });
