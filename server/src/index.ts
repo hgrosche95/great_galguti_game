@@ -71,7 +71,7 @@ function isValidAccessToken(token: string): boolean {
 
 // Erlaubt: lokaler Vite-Dev-Server sowie die Azure Static Web Apps-Domain
 // (Produktion und PR-Vorschau-Umgebungen laufen beide unter *.azurestaticapps.net).
-const ALLOWED_ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+\.azurestaticapps\.net$/;
+const ALLOWED_ORIGIN_PATTERN = /^https:\/\/[a-z0-9.-]+\.azurestaticapps\.net$/;
 
 const app = express();
 app.use(cors({
