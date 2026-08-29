@@ -65,3 +65,24 @@ describe('Auth E2E Flow', () => {
     expect(result).toEqual({ closed: true });
   });
 });
+
+describe('CORS', () => {
+  // Die echte Produktions-URL hat ein zusaetzliches Label vor azurestaticapps.net
+  // (z.B. https://blue-sea-08b19cb0f.7.azurestaticapps.net) - das hat eine
+  // fruehere, zu enge Regex faelschlicherweise blockiert.
+  it('erlaubt die echte Azure Static Web Apps-Produktions-URL', async () => {
+    const res = await fetch(`${baseUrl}/auth/me`, {
+      headers: { Origin: 'https://blue-sea-08b19cb0f.7.azurestaticapps.net' },
+    });
+    expect(res.headers.get('access-control-allow-origin')).toBe(
+      'https://blue-sea-08b19cb0f.7.azurestaticapps.net',
+    );
+  });
+
+  it('lehnt eine fremde Origin ab', async () => {
+    const res = await fetch(`${baseUrl}/auth/me`, {
+      headers: { Origin: 'https://evil.example.com' },
+    });
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+});
