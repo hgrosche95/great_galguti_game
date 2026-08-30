@@ -297,6 +297,37 @@ else
   }" >/dev/null
   say "Federated Credential angelegt."
 fi
+
+# GitHub schickt bei manchen Repos zusaetzlich (teils statt) ein erweitertes
+# Subject-Format mit den unveraenderlichen Owner-/Repo-IDs
+# (repo:owner@ownerId/repo@repoId:ref:...) statt nur den Namen. Ohne
+# passende Federated Credential schlaegt der Azure-Login dann mit
+# 'AADSTS700213: No matching federated identity record' fehl - deshalb
+# legen wir vorsorglich auch diese Variante an.
+FIC_NAME_IMMUTABLE="github-actions-main-immutable-id"
+EXISTING_FIC_IMMUTABLE=$(az ad app federated-credential list --id "$AZURE_CLIENT_ID" \
+  --query "[?name=='$FIC_NAME_IMMUTABLE'] | [0].name" -o tsv 2>/dev/null || true)
+
+if [[ -n "$EXISTING_FIC_IMMUTABLE" ]]; then
+  note "Federated Credential '$FIC_NAME_IMMUTABLE' existiert schon."
+elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  OWNER_ID=$(gh api "repos/${REPO}" --jq '.owner.id' 2>/dev/null || true)
+  REPO_ID=$(gh api "repos/${REPO}" --jq '.id' 2>/dev/null || true)
+  if [[ -n "$OWNER_ID" && -n "$REPO_ID" ]]; then
+    az ad app federated-credential create --id "$AZURE_CLIENT_ID" --parameters "{
+      \"name\": \"$FIC_NAME_IMMUTABLE\",
+      \"issuer\": \"https://token.actions.githubusercontent.com\",
+      \"subject\": \"repo:${REPO%%/*}@${OWNER_ID}/${REPO##*/}@${REPO_ID}:ref:refs/heads/main\",
+      \"audiences\": [\"api://AzureADTokenExchange\"]
+    }" >/dev/null
+    say "Zusaetzliche Federated Credential mit Owner-/Repo-ID angelegt."
+  else
+    warn "Konnte Owner-/Repo-ID nicht per 'gh api' ermitteln - ueberspringe die ID-Variante."
+  fi
+else
+  warn "gh noch nicht eingeloggt - ueberspringe vorerst die ID-Variante der Federated Credential."
+  note "Falls der Deploy-Workflow spaeter mit 'AADSTS700213' fehlschlaegt: Skript nochmal laufen lassen."
+fi
 pause
 
 # ── Stage 5: gh Login + GitHub Secrets setzen ──────────────────────────────
