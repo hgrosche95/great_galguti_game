@@ -2,13 +2,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 32px;
-  padding: 32px 20px 40px;
+  gap: 18px;
+  padding: 18px 20px 22px;
   flex-grow: 1;
 }
 
 .brand {
-  margin-bottom: 12px;
+  margin: 0 0 4px;
+  font-size: 32px;
 }
 
 /* --- Card look, shared by hand cards, played cards and card backs --- */
@@ -104,7 +105,7 @@ button.card:hover {
 .opponents {
   display: flex;
   justify-content: center;
-  gap: 32px;
+  gap: 20px;
   flex-wrap: wrap;
   width: 100%;
 }
@@ -113,8 +114,8 @@ button.card:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 12px;
+  gap: 4px;
+  padding: 6px 12px;
   border-radius: 10px;
   border: 1px solid transparent;
 }
@@ -154,14 +155,14 @@ button.card:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  min-height: 220px;
+  gap: 12px;
+  min-height: 150px;
   justify-content: center;
   width: 100%;
-  padding: 44px;
+  padding: 22px;
   border-radius: 999px;
   border: 1px dashed var(--accent-border);
-  background: radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.05), transparent 70%);
+  background: transparent;
 }
 
 .table-status {
@@ -222,10 +223,10 @@ button.card:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
   width: 100%;
   border-top: 1px solid var(--accent-border);
-  padding-top: 24px;
+  padding-top: 12px;
 }
 
 .selected-cards {
@@ -235,9 +236,14 @@ button.card:hover {
   justify-content: center;
 }
 
+.selected-cards:empty {
+  min-height: 0;
+}
+
 .hand {
   display: flex;
-  gap: 20px;
+  gap: 12px;
+  row-gap: 8px;
   flex-wrap: wrap;
   justify-content: center;
   align-items: flex-start;
@@ -247,7 +253,7 @@ button.card:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .card-row {
