@@ -7,23 +7,42 @@
   flex-grow: 1;
 }
 
+.brand {
+  margin-bottom: 12px;
+}
+
 /* --- Card look, shared by hand cards, played cards and card backs --- */
 
 .card {
   width: 56px;
   height: 78px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  box-shadow: var(--shadow);
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px var(--accent),
+    var(--shadow);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--mono);
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--text-h);
+  font-family: var(--heading);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
   flex-shrink: 0;
+  position: relative;
+}
+
+.card::before {
+  content: attr(data-idx);
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  font-family: var(--heading);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-ink);
 }
 
 button.card {
@@ -36,23 +55,33 @@ button.card:hover {
 }
 
 .card.joker {
-  color: var(--accent);
-  border-color: var(--accent-border);
+  color: var(--burgundy);
+  border-color: var(--burgundy);
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px var(--burgundy),
+    var(--shadow);
+}
+
+.card.joker::before {
+  color: var(--burgundy);
 }
 
 .card.selected {
   transform: translateY(-12px);
-  border-color: var(--accent);
 }
 
 .hand .card.playable {
-  border-color: var(--accent);
-  box-shadow: var(--shadow), 0 0 0 2px var(--accent-bg);
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px var(--accent),
+    var(--shadow),
+    0 0 0 2px var(--accent-bg);
 }
 
 .hand button.card:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.45;
 }
 
 .hand button.card:disabled:hover {
@@ -60,14 +89,14 @@ button.card:hover {
 }
 
 .card.back {
-  background: repeating-linear-gradient(
-    45deg,
-    var(--accent-bg),
-    var(--accent-bg) 6px,
-    transparent 6px,
-    transparent 12px
-  );
-  border-color: var(--accent-border);
+  background:
+    radial-gradient(circle at 50% 50%, var(--felt-dark) 0 3px, transparent 3.5px) 0 0 / 10px 10px,
+    var(--burgundy);
+  border-color: var(--accent);
+}
+
+.card.back::before {
+  content: '';
 }
 
 /* --- Opponents row --- */
@@ -96,7 +125,8 @@ button.card:hover {
 }
 
 .opponent-name {
-  font-weight: 600;
+  font-family: var(--heading);
+  font-weight: 700;
   color: var(--text-h);
 }
 
@@ -127,9 +157,16 @@ button.card:hover {
   gap: 16px;
   min-height: 130px;
   justify-content: center;
+  width: 100%;
+  padding: 22px;
+  border-radius: 999px;
+  border: 1px dashed var(--accent-border);
+  background: radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.05), transparent 70%);
 }
 
 .table-status {
+  font-family: var(--heading);
+  font-style: italic;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -175,7 +212,7 @@ button.card:hover {
   align-items: center;
   gap: 16px;
   width: 100%;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--accent-border);
   padding-top: 24px;
 }
 
@@ -208,7 +245,7 @@ button.card:hover {
 
 .card-group-count {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-h);
   background: var(--accent-bg);
   padding: 1px 9px;
@@ -216,18 +253,49 @@ button.card:hover {
 }
 
 .action-button {
-  font-size: 16px;
-  padding: 10px 28px;
-  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 32px;
+  border-radius: 5px;
   border: none;
-  color: white;
+  color: var(--ink);
   background: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), var(--shadow);
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.12s;
 }
 
 .action-button:hover {
-  opacity: 0.85;
+  opacity: 0.9;
+}
+
+.action-button:active {
+  transform: translateY(1px);
+}
+
+.action-button.secondary {
+  color: var(--text-h);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.name-input {
+  font: 500 15px var(--sans);
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--accent-border);
+  background: var(--surface-2);
+  color: var(--ink);
+  width: 220px;
+  text-align: center;
+}
+
+.waitroom-actions {
+  display: flex;
+  gap: 12px;
 }
 
 /* --- Login/Register --- */
@@ -237,29 +305,37 @@ button.card:hover {
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
-  width: 280px;
+  width: 300px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 30px 28px 26px;
+  box-shadow: var(--shadow);
+}
+
+.login-form h2 {
+  color: var(--ink);
 }
 
 .login-form input {
-  font: inherit;
+  font: 500 15px var(--sans);
   padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text-h);
+  border-radius: 4px;
+  border: 1px solid var(--accent-border);
+  background: var(--surface-2);
+  color: var(--ink);
 }
 
 .login-error {
-  color: #e5484d;
+  color: #b3273e;
   font-size: 14px;
 }
 
 .login-switch {
   background: none;
   border: none;
-  color: var(--accent);
+  color: var(--accent-ink);
   cursor: pointer;
-  font: inherit;
-  font-size: 14px;
+  font: italic 500 13px var(--sans);
   padding: 0;
 }
