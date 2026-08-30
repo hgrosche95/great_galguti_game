@@ -1,2 +1,3 @@
 node_modules/
 dist/
+scripts/.setup-azure-deploy-oidc.env
