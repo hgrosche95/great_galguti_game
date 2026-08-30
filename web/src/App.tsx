@@ -167,13 +167,16 @@ function App() {
           {gameOver ? 'Spiel vorbei' : `${currentPlayerName} ${serverState.currentPlayerId === serverState.yourId ? 'bist dran' : 'ist am Zug'}`}
         </div>
         {gameOver ? (
-          <ol className="ranking">
-            {serverState.ranking.map(id => (
-              <li key={id}>
-                {id === serverState.yourId ? 'Du' : serverState.players.find(p => p.id === id)?.name}
-              </li>
-            ))}
-          </ol>
+          <>
+            <ol className="ranking">
+              {serverState.ranking.map(id => (
+                <li key={id}>
+                  {id === serverState.yourId ? 'Du' : serverState.players.find(p => p.id === id)?.name}
+                </li>
+              ))}
+            </ol>
+            <button className="action-button" onClick={sendStart}>Nochmal spielen</button>
+          </>
         ) : (
           <div className="played-cards">
             {serverState.lastMove && serverState.lastMove.length > 0 ? (
@@ -227,7 +230,7 @@ function App() {
         <button
           className="action-button"
           onClick={makeMove(selectedCards)}
-          hidden={serverState.currentPlayerId !== serverState.yourId}
+          hidden={gameOver || serverState.currentPlayerId !== serverState.yourId}
         >
           {selectedCards.length === 0 ? 'Passen' : 'Spielen'}
         </button>

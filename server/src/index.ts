@@ -234,7 +234,7 @@ function maybePlayBotTurn() {
     const bot = players.find(p => p.id === currentPlayerId)!;
     const cards = chooseMove(bot, trickState.lastMove);
     processMove(currentPlayerId, cards);
-  }, 800);
+  }, 1800);
 }
 
 function broadcastGameState() {
