@@ -162,7 +162,7 @@ button.card:hover {
   padding: 22px;
   border-radius: 999px;
   border: 1px dashed var(--accent-border);
-  background: radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.05), transparent 70%);
+  background: transparent;
 }
 
 .table-status {
