@@ -81,7 +81,7 @@ In Produktion müssen `JWT_ACCESS_SECRET` und `JWT_REFRESH_SECRET` als Umgebungs
 ## Live-Deployment
 
 - **Web-UI**: https://blue-sea-08b19cb0f.7.azurestaticapps.net (Azure Static Web Apps, Free-Tier). Jeder Push auf `main` deployed automatisch neu (`.github/workflows/azure-static-web-apps.yml`); jeder Pull Request bekommt zusätzlich eine eigene Vorschau-Umgebung.
-- **Server**: läuft als Container auf Azure Container Apps (Image via `server/Dockerfile`, gebaut mit esbuild, in der GitHub Container Registry veröffentlicht). Anders als die Web-UI wird der Server aktuell **nicht** automatisch bei jedem Push neu deployed — ein neues Image muss manuell gebaut, gepusht und in Azure aktualisiert werden.
+- **Server**: läuft als Container auf Azure Container Apps (Image via `server/Dockerfile`, gebaut mit esbuild, in der GitHub Container Registry veröffentlicht). Jeder Push auf `main` mit Änderungen in `server/` oder `src/` baut automatisch ein neues Image und deployed es (`.github/workflows/azure-container-apps.yml`) — dafür müssen einmalig die Secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` und `AZURE_SUBSCRIPTION_ID` im Repo hinterlegt sein (OIDC/Federated Credentials, kein Passwort im Klartext).
 
 Zusammen ergibt das ein öffentlich erreichbares Online-Spiel — mehrere echte Spieler von unterschiedlichen Orten können gemeinsam eine Partie spielen.
 
@@ -91,6 +91,5 @@ Der `main`-Branch ist geschützt: Änderungen laufen über einen eigenen Branch 
 
 ## Geplant
 
-- Automatisches Server-Deployment bei Codeänderungen (aktuell manueller Docker-Build + Push + Azure-Update)
 - Echte Persistenz für Nutzerkonten (aktuell In-Memory, geht bei jedem Server-Neustart verloren) und eine Sperrliste für Refresh-Tokens (aktuell zustandslos, kein echtes Logout/Revoke)
 - Weitere Schritte Richtung Microservices: eigener Lobby-Service (Go), GraphQL-Gateway, RabbitMQ, Kubernetes-Deployment
