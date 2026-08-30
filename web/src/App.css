@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
-  padding: 18px 20px 22px;
+  gap: clamp(18px, 3vh, 40px);
+  padding: clamp(18px, 3vh, 40px) 20px clamp(22px, 4vh, 48px);
   flex-grow: 1;
 }
 
@@ -105,7 +105,7 @@ button.card:hover {
 .opponents {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: clamp(20px, 3vw, 40px);
   flex-wrap: wrap;
   width: 100%;
 }
@@ -155,14 +155,14 @@ button.card:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  min-height: 150px;
+  gap: clamp(12px, 2vh, 20px);
+  min-height: clamp(150px, 22vh, 220px);
   justify-content: center;
   width: 100%;
-  padding: 22px;
+  padding: clamp(22px, 3.5vh, 44px);
   border-radius: 999px;
   border: 1px dashed var(--accent-border);
-  background: transparent;
+  background: var(--bg);
 }
 
 .table-status {
@@ -223,10 +223,11 @@ button.card:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: clamp(8px, 1.5vh, 16px);
   width: 100%;
+  margin-top: clamp(8px, 2vh, 24px);
   border-top: 1px solid var(--accent-border);
-  padding-top: 12px;
+  padding-top: clamp(20px, 3vh, 32px);
 }
 
 .selected-cards {
@@ -234,10 +235,6 @@ button.card:hover {
   gap: 8px;
   min-height: 78px;
   justify-content: center;
-}
-
-.selected-cards:empty {
-  min-height: 0;
 }
 
 .hand {
