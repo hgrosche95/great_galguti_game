@@ -100,16 +100,20 @@ function App() {
   if (!serverState) {
     return (
       <div className="game">
+        <h1 className="brand">Great Galguti</h1>
         <p>Warte auf Mitspieler: {waitingCount} verbunden</p>
         <input
+          className="name-input"
           type="text"
           placeholder="Dein Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={sendSetName}
         />
-        <button onClick={sendAddBot}>Bot hinzufügen</button>
-        <button onClick={sendStart}>Spiel starten</button>
+        <div className="waitroom-actions">
+          <button className="action-button secondary" onClick={sendAddBot}>Bot hinzufügen</button>
+          <button className="action-button" onClick={sendStart}>Spiel starten</button>
+        </div>
       </div>
     );
   }
@@ -174,7 +178,7 @@ function App() {
           <div className="played-cards">
             {serverState.lastMove && serverState.lastMove.length > 0 ? (
               serverState.lastMove.map((card, i) => (
-                <div key={i} className={`card${card.isJoker ? ' joker' : ''}`}>
+                <div key={i} className={`card${card.isJoker ? ' joker' : ''}`} data-idx={card.isJoker ? 'J' : card.value}>
                   <CardFace card={card} />
                 </div>
               ))
@@ -191,6 +195,7 @@ function App() {
             <button
               key={i}
               className={`card selected${card.isJoker ? ' joker' : ''}`}
+              data-idx={card.isJoker ? 'J' : card.value}
               onClick={() => selectCard(card)}
             >
               <CardFace card={card} />
@@ -206,6 +211,7 @@ function App() {
                   <button
                     key={i}
                     className={`card${card.isJoker ? ' joker' : ''}${isPlayable(card) ? ' playable' : ''}`}
+                    data-idx={card.isJoker ? 'J' : card.value}
                     onClick={() => selectCard(card)}
                     disabled={!isPlayable(card)}
                   >

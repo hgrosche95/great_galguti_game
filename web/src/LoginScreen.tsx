@@ -44,6 +44,7 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
 
   return (
     <div className="game">
+      <h1 className="brand">Great Galguti</h1>
       <form onSubmit={submit} className="login-form">
         <h2>{mode === 'login' ? 'Einloggen' : 'Registrieren'}</h2>
 
