@@ -8,6 +8,11 @@
 
 set -euo pipefail
 
+# Git Bash/MSYS auf Windows wandelt Argumente, die mit "/" beginnen (wie
+# "/subscriptions/..."), sonst faelschlicherweise in Windows-Dateipfade um,
+# bevor sie an az/gh uebergeben werden. Auf Linux/macOS ist das ein No-op.
+export MSYS_NO_PATHCONV=1
+
 # ──────────────────────────────────────────────────────────────────────────
 # Wizard library — delightful, consistent UX. Identical across every wizard.
 # ──────────────────────────────────────────────────────────────────────────
