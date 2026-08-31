@@ -333,12 +333,20 @@ button.card:hover {
 }
 
 .login-form input {
+  width: 100%;
   font: 500 15px var(--sans);
   padding: 10px 12px;
   border-radius: 4px;
   border: 1px solid var(--accent-border);
   background: var(--surface-2);
   color: var(--ink);
+}
+
+.field-hint {
+  margin: 4px 2px 0;
+  font-size: 11px;
+  color: var(--accent-ink);
+  text-align: left;
 }
 
 .login-error {

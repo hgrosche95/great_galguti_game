@@ -78,13 +78,16 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
             required
           />
         )}
-        <input
-          type="email"
-          placeholder="E-Mail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+        <div className="field-with-hint">
+          <input
+            type="email"
+            placeholder="E-Mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <p className="field-hint">Die E-Mail-Adresse wird nicht dauerhaft gespeichert.</p>
+        </div>
         <input
           type="password"
           placeholder="Passwort"
