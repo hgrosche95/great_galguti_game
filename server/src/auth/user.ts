@@ -1,3 +1,5 @@
+import { prisma } from '../prisma';
+
 export interface User {
   id: number;
   username: string;
@@ -6,30 +8,21 @@ export interface User {
   createdAt: Date;
 }
 
-let users: User[] = [];
-let nextUserId = 1;
-
-export function findUserByEmail(email: string): User | undefined {
-  const normalized = email.toLowerCase();
-  return users.find(u => u.email.toLowerCase() === normalized);
+export function findUserByEmail(email: string): Promise<User | null> {
+  // Postgres-Text-Vergleich ist standardmaessig case-sensitive, E-Mails
+  // sollen aber case-insensitive eindeutig sein (siehe unique-Constraint-
+  // Kommentar in createUser).
+  return prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
 }
 
-export function findUserByUsername(username: string): User | undefined {
-  return users.find(u => u.username === username);
+export function findUserByUsername(username: string): Promise<User | null> {
+  return prisma.user.findUnique({ where: { username } });
 }
 
-export function findUserById(id: number): User | undefined {
-  return users.find(u => u.id === id);
+export function findUserById(id: number): Promise<User | null> {
+  return prisma.user.findUnique({ where: { id } });
 }
 
-export function createUser(username: string, email: string, passwordHash: string): User {
-  const user: User = {
-    id: nextUserId++,
-    username,
-    email,
-    passwordHash,
-    createdAt: new Date(),
-  };
-  users.push(user);
-  return user;
+export function createUser(username: string, email: string, passwordHash: string): Promise<User> {
+  return prisma.user.create({ data: { username, email, passwordHash } });
 }

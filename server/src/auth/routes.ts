@@ -40,13 +40,17 @@ authRouter.post('/register', async (req, res) => {
     return;
   }
 
-  if (findUserByEmail(email) || findUserByUsername(trimmedUsername)) {
+  const [existingEmail, existingUsername] = await Promise.all([
+    findUserByEmail(email),
+    findUserByUsername(trimmedUsername),
+  ]);
+  if (existingEmail || existingUsername) {
     res.status(409).json({ error: 'username oder email bereits vergeben' });
     return;
   }
 
   const passwordHash = await hashPassword(password);
-  const user = createUser(trimmedUsername, email, passwordHash);
+  const user = await createUser(trimmedUsername, email, passwordHash);
 
   res.status(201).json({ id: user.id, username: user.username, email: user.email, ...issueTokens(user) });
 });
@@ -62,7 +66,7 @@ authRouter.post('/guest', async (req, res) => {
   const email = `guest-${guestId}@guest.local`;
   const passwordHash = await hashPassword(randomUUID());
 
-  const user = createUser(username, email, passwordHash);
+  const user = await createUser(username, email, passwordHash);
 
   res.status(201).json({ id: user.id, username: user.username, email: user.email, ...issueTokens(user) });
 });
@@ -75,7 +79,7 @@ authRouter.post('/login', async (req, res) => {
     return;
   }
 
-  const user = findUserByEmail(email);
+  const user = await findUserByEmail(email);
   const hashToCheck = user ? user.passwordHash : await getDummyHash();
   const passwordValid = await verifyPassword(password, hashToCheck);
 
@@ -87,7 +91,7 @@ authRouter.post('/login', async (req, res) => {
   res.status(200).json({ id: user.id, username: user.username, email: user.email, ...issueTokens(user) });
 });
 
-authRouter.post('/refresh', (req, res) => {
+authRouter.post('/refresh', async (req, res) => {
   const { refreshToken } = req.body ?? {};
 
   if (typeof refreshToken !== 'string') {
@@ -97,7 +101,7 @@ authRouter.post('/refresh', (req, res) => {
 
   try {
     const payload = verifyRefreshToken(refreshToken);
-    const user = findUserById(payload.sub);
+    const user = await findUserById(payload.sub);
     if (!user) {
       res.status(401).json({ error: 'refreshToken ungueltig oder abgelaufen' });
       return;
