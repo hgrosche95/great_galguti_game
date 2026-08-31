@@ -2,6 +2,14 @@
 
 Ein rundenbasiertes Kartenspiel nach Stichspiel-Logik für 3–8 Spieler, geschrieben in TypeScript. Die vollständigen Spielregeln stehen in [game-logic.md](./game-logic.md).
 
+**Live spielen:** https://blue-sea-08b19cb0f.7.azurestaticapps.net
+
+## Screenshots
+
+| Login | Partie |
+| --- | --- |
+| ![Login-Screen](./docs/screenshots/login.png) | ![Laufende Partie mit Bots](./docs/screenshots/gameplay.png) |
+
 ## Kurzfassung der Regeln
 
 - Zahlenkarten 1–12 (jede so oft wie ihr Wert) plus 2 Joker (Wert 13).
