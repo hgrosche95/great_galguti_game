@@ -56,6 +56,23 @@ describe('Auth E2E Flow', () => {
     ws.close();
   });
 
+  it('Als Gast spielen -> Spiel beitreten mit Token', async () => {
+    const guestRes = await fetch(`${baseUrl}/auth/guest`, { method: 'POST' });
+    expect(guestRes.status).toBe(201);
+    const { accessToken, username } = await guestRes.json();
+    expect(typeof accessToken).toBe('string');
+    expect(username).toMatch(/^Gast-/);
+
+    const ws = new WebSocket(wsUrl);
+    await new Promise((resolve) => ws.once('open', resolve));
+    ws.send(JSON.stringify({ type: 'auth', token: accessToken }));
+
+    const result = await waitForFirstMessageOrClose(ws);
+    expect(result).toMatchObject({ type: 'waiting' });
+
+    ws.close();
+  });
+
   it('Spiel beitreten ohne gueltiges Token wird abgelehnt', async () => {
     const ws = new WebSocket(wsUrl);
     await new Promise((resolve) => ws.once('open', resolve));

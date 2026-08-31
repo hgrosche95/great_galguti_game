@@ -333,6 +333,7 @@ button.card:hover {
 }
 
 .login-form input {
+  width: 100%;
   font: 500 15px var(--sans);
   padding: 10px 12px;
   border-radius: 4px;
@@ -341,9 +342,39 @@ button.card:hover {
   color: var(--ink);
 }
 
+.field-hint {
+  margin: 4px 2px 0;
+  font-size: 11px;
+  color: var(--accent-ink);
+  text-align: left;
+}
+
 .login-error {
   color: #b3273e;
   font-size: 14px;
+}
+
+.login-form .action-button.secondary {
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent-ink);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--accent-border);
 }
 
 .login-switch {

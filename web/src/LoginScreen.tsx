@@ -42,6 +42,27 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
     }
   };
 
+  const playAsGuest = async () => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${apiUrl}/auth/guest`, { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? 'Unbekannter Fehler');
+        return;
+      }
+
+      onAuthenticated(data.accessToken);
+    } catch {
+      setError('Server nicht erreichbar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="game">
       <h1 className="brand">Great Galguti</h1>
@@ -57,13 +78,16 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
             required
           />
         )}
-        <input
-          type="email"
-          placeholder="E-Mail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+        <div className="field-with-hint">
+          <input
+            type="email"
+            placeholder="E-Mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <p className="field-hint">Die E-Mail-Adresse wird nicht dauerhaft gespeichert.</p>
+        </div>
         <input
           type="password"
           placeholder="Passwort"
@@ -76,6 +100,12 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
 
         <button type="submit" className="action-button" disabled={loading}>
           {mode === 'login' ? 'Einloggen' : 'Registrieren'}
+        </button>
+
+        <div className="login-divider">oder</div>
+
+        <button type="button" className="action-button secondary" onClick={playAsGuest} disabled={loading}>
+          Als Gast spielen
         </button>
 
         <button
