@@ -268,27 +268,27 @@ else
     --tier Burstable \
     --storage-size 32 \
     --version 16 \
-    --public-access None \
+    --public-access Enabled \
     --yes >/dev/null
   say "Server angelegt."
 fi
 
 EXISTING_DB=$(az postgres flexible-server db show \
   --resource-group "$RESOURCE_GROUP" --server-name "$PG_SERVER_NAME" \
-  --database-name "$PG_DB_NAME" --query name -o tsv 2>/dev/null || true)
+  --name "$PG_DB_NAME" --query name -o tsv 2>/dev/null || true)
 
 if [[ -n "$EXISTING_DB" ]]; then
   note "Datenbank '$PG_DB_NAME' existiert schon."
 else
   az postgres flexible-server db create \
     --resource-group "$RESOURCE_GROUP" --server-name "$PG_SERVER_NAME" \
-    --database-name "$PG_DB_NAME" >/dev/null
+    --name "$PG_DB_NAME" >/dev/null
   say "Datenbank '$PG_DB_NAME' angelegt."
 fi
 
 EXISTING_FIREWALL=$(az postgres flexible-server firewall-rule show \
-  --resource-group "$RESOURCE_GROUP" --name "$PG_SERVER_NAME" \
-  --rule-name AllowAllAzureServices --query name -o tsv 2>/dev/null || true)
+  --resource-group "$RESOURCE_GROUP" --server-name "$PG_SERVER_NAME" \
+  --name AllowAllAzureServices --query name -o tsv 2>/dev/null || true)
 
 if [[ -n "$EXISTING_FIREWALL" ]]; then
   note "Firewall-Regel fuer Azure-Dienste existiert schon."
@@ -297,8 +297,8 @@ else
   # Zugriffe von beliebigen Azure-internen Quell-IPs (unsere Container App),
   # NICHT das ganze Internet.
   az postgres flexible-server firewall-rule create \
-    --resource-group "$RESOURCE_GROUP" --name "$PG_SERVER_NAME" \
-    --rule-name AllowAllAzureServices \
+    --resource-group "$RESOURCE_GROUP" --server-name "$PG_SERVER_NAME" \
+    --name AllowAllAzureServices \
     --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 >/dev/null
   say "Firewall-Regel angelegt (erlaubt Azure-interne Zugriffe, nicht das offene Internet)."
 fi
