@@ -48,15 +48,18 @@ Alle Module sind mit Vitest-Tests abgedeckt.
 ### Server (`server/`)
 
 ```bash
+docker compose up -d            # Postgres lokal starten (einmalig, im Repo-Root)
 cd server
-npm install
+cp .env.example .env            # DATABASE_URL fuer lokales Postgres
+npm install                     # ruft ueber postinstall automatisch "prisma generate" auf
+npm run migrate                 # Migrationen lokal anwenden (prisma migrate dev)
 npm run dev        # tsx src/index.ts, HTTP-/WebSocket-Server auf http://localhost:8080
 npm test           # Unit- und E2E-Tests mit Vitest ausführen
 npm run typecheck  # tsc --noEmit
 npm run build      # esbuild-Bundle nach dist/index.js (fuer Deployment)
 ```
 
-Verwaltet Nutzerkonten (Registrierung/Login, siehe [Authentifizierung](#authentifizierung)) sowie einen einzigen laufenden Warteraum/Partie: Spieler verbinden sich per WebSocket mit gültigem Access-Token, können optional Bots hinzufügen und ihren Namen wählen, jemand startet die Partie. Danach validiert der Server jeden Zug über `move()` aus `src/` und schickt jedem Client nur seine eigene Hand plus die Kartenanzahl der anderen (siehe Sichtbarkeitsregel in den Spielregeln). Verbindungsabbrüche mitten im Spiel werden abgefangen (betroffener Spieler wird übersprungen, Bots übernehmen nie unabsichtlich dessen Zug).
+Nutzerkonten (Registrierung/Login, siehe [Authentifizierung](#authentifizierung)) liegen in Postgres (Prisma als ORM, siehe [`prisma/schema.prisma`](./server/prisma/schema.prisma)); Migrationen laufen beim Containerstart automatisch (`prisma migrate deploy`, siehe [`server/Dockerfile`](./server/Dockerfile)), bevor der eigentliche Server startet. Daneben verwaltet der Server einen einzigen laufenden Warteraum/Partie: Spieler verbinden sich per WebSocket mit gültigem Access-Token, können optional Bots hinzufügen und ihren Namen wählen, jemand startet die Partie. Danach validiert der Server jeden Zug über `move()` aus `src/` und schickt jedem Client nur seine eigene Hand plus die Kartenanzahl der anderen (siehe Sichtbarkeitsregel in den Spielregeln). Verbindungsabbrüche mitten im Spiel werden abgefangen (betroffener Spieler wird übersprungen, Bots übernehmen nie unabsichtlich dessen Zug).
 
 ### Web-UI (`web/`)
 
@@ -71,7 +74,7 @@ Vor dem Warteraum steht ein Login/Registrieren-Formular; erst mit dem dabei erha
 
 ## Authentifizierung
 
-Der Server verwaltet Nutzerkonten mit JWT-Authentifizierung (aktuell In-Memory, siehe [Geplant](#geplant)):
+Der Server verwaltet Nutzerkonten mit JWT-Authentifizierung, persistiert in Postgres:
 
 | Endpoint             | Methode | Body                                | Antwort                                              |
 | --------------------- | ------- | ------------------------------------ | ----------------------------------------------------- |
@@ -93,6 +96,7 @@ In Produktion müssen `JWT_ACCESS_SECRET` und `JWT_REFRESH_SECRET` als Umgebungs
 
 - **Web-UI**: https://blue-sea-08b19cb0f.7.azurestaticapps.net (Azure Static Web Apps, Free-Tier). Jeder Push auf `main` deployed automatisch neu (`.github/workflows/azure-static-web-apps.yml`); jeder Pull Request bekommt zusätzlich eine eigene Vorschau-Umgebung.
 - **Server**: läuft als Container auf Azure Container Apps (Image via `server/Dockerfile`, gebaut mit esbuild, in der GitHub Container Registry veröffentlicht). Jeder Push auf `main` mit Änderungen in `server/` oder `src/` baut automatisch ein neues Image und deployed es (`.github/workflows/azure-container-apps.yml`) — dafür müssen einmalig die Secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` und `AZURE_SUBSCRIPTION_ID` im Repo hinterlegt sein (OIDC/Federated Credentials, kein Passwort im Klartext). Einmaliges Setup: `./scripts/setup-azure-deploy-oidc.sh`.
+- **Datenbank**: Azure Database for PostgreSQL (Flexible Server, Burstable-Tier). Verbindung läuft über ein Container-App-Secret (`DATABASE_URL`), Migrationen wendet der Container beim Start selbst an. Einmaliges Setup: `./scripts/setup-azure-postgres.sh`.
 
 Zusammen ergibt das ein öffentlich erreichbares Online-Spiel — mehrere echte Spieler von unterschiedlichen Orten können gemeinsam eine Partie spielen.
 
@@ -102,5 +106,5 @@ Der `main`-Branch ist geschützt: Änderungen laufen über einen eigenen Branch 
 
 ## Geplant
 
-- Echte Persistenz für Nutzerkonten (aktuell In-Memory, geht bei jedem Server-Neustart verloren) und eine Sperrliste für Refresh-Tokens (aktuell zustandslos, kein echtes Logout/Revoke)
+- Eine Sperrliste für Refresh-Tokens (aktuell zustandslos, kein echtes Logout/Revoke)
 - Weitere Schritte Richtung Microservices: eigener Lobby-Service (Go), GraphQL-Gateway, RabbitMQ, Kubernetes-Deployment

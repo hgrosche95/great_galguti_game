@@ -28,12 +28,14 @@ function waitForFirstMessageOrClose(ws: WebSocket): Promise<{ type: string } | {
 
 describe('Auth E2E Flow', () => {
   it('Registrieren -> Einloggen -> Spiel beitreten mit Token', async () => {
-    const email = `e2e-${Date.now()}@example.com`;
+    const unique = Date.now();
+    const username = `e2euser-${unique}`;
+    const email = `e2e-${unique}@example.com`;
 
     const registerRes = await fetch(`${baseUrl}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'e2euser', email, password: 'supersecret' }),
+      body: JSON.stringify({ username, email, password: 'supersecret' }),
     });
     expect(registerRes.status).toBe(201);
 
