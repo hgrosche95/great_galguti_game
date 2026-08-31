@@ -77,8 +77,11 @@ Der Server verwaltet Nutzerkonten mit JWT-Authentifizierung (aktuell In-Memory, 
 | --------------------- | ------- | ------------------------------------ | ----------------------------------------------------- |
 | `/auth/register`      | POST    | `{ username, email, password }`      | `201` mit `{ id, username, email, accessToken, refreshToken }` |
 | `/auth/login`         | POST    | `{ email, password }`                | `200` mit `{ id, username, email, accessToken, refreshToken }` |
+| `/auth/guest`         | POST    | –                                     | `201` mit `{ id, username, email, accessToken, refreshToken }` |
 | `/auth/refresh`       | POST    | `{ refreshToken }`                   | `200` mit `{ accessToken }`                            |
 | `/auth/me`            | GET     | – (Header `Authorization: Bearer <accessToken>`) | `200` mit `{ id, username }`             |
+
+`/auth/guest` erzeugt ohne Formular ein Nutzerkonto mit zufälligem Namen/E-Mail/Passwort und gibt sofort ein Token-Paar zurück — nutzt dieselbe Infrastruktur wie Register/Login, die WS-Token-Pflicht bleibt also unverändert.
 
 Passwörter werden nie im Klartext gespeichert (Hashing mit `bcryptjs`). Das **Access-Token** ist 15 Minuten gültig und wird bei jeder geschützten Anfrage mitgeschickt; das **Refresh-Token** ist 7 Tage gültig und wird ausschließlich benutzt, um über `/auth/refresh` ein neues Access-Token zu bekommen, ohne dass sich der Nutzer erneut einloggen muss. Beide Tokens sind mit unterschiedlichen Server-Secrets signiert und dadurch nicht gegeneinander austauschbar.
 

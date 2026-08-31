@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { createUser, findUserByEmail, findUserById, findUserByUsername, type User } from './user';
 import { hashPassword, verifyPassword } from './password';
@@ -46,6 +47,22 @@ authRouter.post('/register', async (req, res) => {
 
   const passwordHash = await hashPassword(password);
   const user = createUser(trimmedUsername, email, passwordHash);
+
+  res.status(201).json({ id: user.id, username: user.username, email: user.email, ...issueTokens(user) });
+});
+
+// Gastkonto ohne Formular: erzeugt einen Nutzer mit zufaelligem Namen/E-Mail/
+// Passwort und gibt sofort ein Token-Paar zurueck. Nutzt dieselbe User-/JWT-
+// Infrastruktur wie Register/Login, deshalb bleibt die WS-Token-Pflicht
+// unveraendert - ein Gast ist einfach ein Nutzer, den sich der Server selbst
+// ausgedacht hat, statt jemand, der ganz ohne Token spielen darf.
+authRouter.post('/guest', async (req, res) => {
+  const guestId = randomUUID();
+  const username = `Gast-${guestId.slice(0, 6)}`;
+  const email = `guest-${guestId}@guest.local`;
+  const passwordHash = await hashPassword(randomUUID());
+
+  const user = createUser(username, email, passwordHash);
 
   res.status(201).json({ id: user.id, username: user.username, email: user.email, ...issueTokens(user) });
 });
