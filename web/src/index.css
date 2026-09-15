@@ -1,3 +1,9 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 :root {
   --text: #c9bb92;
   --text-h: #f3e9cc;
@@ -43,12 +49,12 @@
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
   background: var(--bg);
 }
 
 body {
   margin: 0;
+  overflow-x: hidden;
 }
 
 h1,
