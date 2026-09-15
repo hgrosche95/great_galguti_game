@@ -7,8 +7,8 @@
   flex-grow: 1;
 
   @media (max-width: 600px) {
-    padding-left: 8px;
-    padding-right: 8px;
+    gap: 8px;
+    padding: 8px 8px 10px;
   }
 }
 
@@ -209,8 +209,10 @@ button.card:hover {
   background: var(--bg);
 
   @media (max-width: 600px) {
-    padding: clamp(16px, 3.5vh, 32px) 12px;
-    min-height: clamp(110px, 20vh, 180px);
+    gap: 6px;
+    padding: 8px 12px;
+    min-height: 0;
+    border-radius: 16px;
   }
 }
 
@@ -219,6 +221,10 @@ button.card:hover {
   font-style: italic;
   font-weight: 600;
   color: var(--text-h);
+
+  @media (max-width: 600px) {
+    font-size: 14px;
+  }
 }
 
 .played-cards {
@@ -293,6 +299,12 @@ button.card:hover {
   margin-top: clamp(8px, 2vh, 24px);
   border-top: 1px solid var(--accent-border);
   padding-top: clamp(20px, 3vh, 32px);
+
+  @media (max-width: 600px) {
+    gap: 6px;
+    margin-top: 4px;
+    padding-top: 8px;
+  }
 }
 
 .selected-cards {
@@ -304,6 +316,12 @@ button.card:hover {
   @media (max-width: 600px) {
     gap: 4px;
     min-height: 53px;
+  }
+
+  &:empty {
+    @media (max-width: 600px) {
+      min-height: 0;
+    }
   }
 }
 
@@ -364,6 +382,10 @@ button.card:hover {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), var(--shadow);
   cursor: pointer;
   transition: opacity 0.15s, transform 0.12s;
+
+  @media (max-width: 600px) {
+    padding: 8px 24px;
+  }
 }
 
 .action-button:hover {
