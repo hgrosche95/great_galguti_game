@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/hgrosche95/great_galguti_game#readme",
   "devDependencies": {
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.6.2",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
