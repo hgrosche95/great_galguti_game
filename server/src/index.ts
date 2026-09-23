@@ -23,6 +23,24 @@ let trickState: ReturnType<typeof createTrickState> | null = null;
 let nextPlayerId = 1;
 let finishOrder: number[] = [];
 
+// Setzt den kompletten Spielzustand zurueck (wenn alle gegangen sind und in Tests).
+function resetGame() {
+  connections = [];
+  bots = [];
+  players = [];
+  trickState = null;
+  finishOrder = [];
+}
+
+function isGameOver(): boolean {
+  return players.filter(p => p.hand.length > 0).length <= 1;
+}
+
+// trickState bleibt nach Spielende gesetzt, deshalb reicht !trickState nicht.
+function isGameRunning(): boolean {
+  return trickState !== null && !isGameOver();
+}
+
 function isConnected(playerId: number): boolean {
   return connections.some(conn => conn.playerId === playerId) || bots.includes(playerId);
 }
@@ -69,6 +87,10 @@ function isValidAccessToken(token: string): boolean {
   }
 }
 
+function isValidCardList(value: unknown): value is { value: number; isJoker: boolean }[] {
+  return Array.isArray(value) && value.every(c => typeof c === 'object' && c !== null);
+}
+
 // Erlaubt: lokaler Vite-Dev-Server sowie die Azure Static Web Apps-Domain
 // (Produktion und PR-Vorschau-Umgebungen laufen beide unter *.azurestaticapps.net).
 const ALLOWED_ORIGIN_PATTERN = /^https:\/\/[a-z0-9.-]+\.azurestaticapps\.net$/;
@@ -101,7 +123,27 @@ wss.on('connection', (socket) => {
   }, 5000);
 
   socket.on('message', (raw) => {
-    const data = JSON.parse(raw.toString());
+    // Sicherheitsnetz: ein Fehler in einer einzelnen Nachricht darf nie den
+    // ganzen Prozess (und damit das Spiel fuer alle) beenden.
+    try {
+      handleMessage(raw.toString());
+    } catch (err) {
+      console.error('Fehler beim Verarbeiten einer Nachricht:', err);
+    }
+  });
+
+  function handleMessage(text: string) {
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    // JSON.parse('null') oder '42' klappt, aber data.type wuerde dann crashen
+    if (typeof data !== 'object' || data === null) {
+      if (!authed) socket.close();
+      return;
+    }
 
     if (!authed) {
       if (data.type !== 'auth' || typeof data.token !== 'string' || !isValidAccessToken(data.token)) {
@@ -121,31 +163,38 @@ wss.on('connection', (socket) => {
       return;
     }
 
-    if (data.type === 'setName' && !trickState && typeof data.name === 'string') {
+    if (data.type === 'setName' && !isGameRunning() && typeof data.name === 'string') {
       const connection = connections.find(conn => conn.socket === socket);
       const trimmedName = data.name.trim().slice(0, 20);
       if (connection && trimmedName) {
         connection.name = trimmedName;
       }
-    } else if (data.type === 'addBot' && !trickState && connections.length + bots.length < 8) {
+    } else if (data.type === 'addBot' && !isGameRunning() && connections.length + bots.length < 8) {
       bots.push(nextPlayerId++);
       broadcastWaitingCount();
-    } else if (data.type === 'start' && connections.length + bots.length >= 3) {
+    } else if (data.type === 'start' && !isGameRunning() && connections.length + bots.length >= 3) {
       startGame();
-    } else if (data.type === 'move' && trickState) {
-      const me = players.find(p => p.id === playerId)!;
+    } else if (data.type === 'move' && isGameRunning() && isValidCardList(data.cards)) {
+      // Wer waehrend eines laufenden Spiels beitritt, ist (noch) kein Spieler.
+      const me = players.find(p => p.id === playerId);
+      if (!me) return;
       const cards = resolveCardsFromHand(me.hand, data.cards);
       if (!cards) return; // Spieler behauptet, Karten zu haben, die er nicht hat
 
       processMove(playerId, cards);
     }
-  });
+  }
 
   socket.on('close', () => {
     clearTimeout(authTimeout);
     if (!authed) return;
 
     connections = connections.filter(conn => conn.socket !== socket);
+    if (connections.length === 0) {
+      // Alle Menschen sind weg -> verwaiste Partie verwerfen, sonst bleibt die Lobby blockiert.
+      resetGame();
+      return;
+    }
     broadcastWaitingCount();
 
     if (trickState) {
@@ -240,13 +289,15 @@ function maybePlayBotTurn() {
 function broadcastGameState() {
   if (!trickState) return;
 
-  const gameOver = players.filter(p => p.hand.length > 0).length <= 1;
+  const gameOver = isGameOver();
   const ranking = gameOver
     ? [...finishOrder, ...players.filter(p => !finishOrder.includes(p.id)).map(p => p.id)]
     : [];
 
   for (const conn of connections) {
-    const me = players.find(p => p.id === conn.playerId)!;
+    // Spaet beigetretene Verbindungen sitzen in der Lobby und spielen erst die naechste Runde mit.
+    const me = players.find(p => p.id === conn.playerId);
+    if (!me) continue;
     const state = {
       type: 'state',
       yourId: conn.playerId,
@@ -266,7 +317,7 @@ function broadcastGameState() {
   }
 }
 
-export { httpServer };
+export { httpServer, resetGame };
 
 // Nur beim direkten Start (node index.js) lauschen, nicht wenn dieses
 // Modul von einem Test importiert wird (der startet den Server selbst
