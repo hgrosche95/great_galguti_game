@@ -85,7 +85,7 @@ function App() {
     }
   };
 
-  const makeMove = (cards: Card[]) => () => {
+  const makeMove = (cards: Card[]) => {
     socketRef.current?.send(JSON.stringify({
       type: 'move',
       cards: cards.map(c => ({ value: c.value, isJoker: c.isJoker })),
@@ -229,7 +229,7 @@ function App() {
 
         <button
           className="action-button"
-          onClick={makeMove(selectedCards)}
+          onClick={() => makeMove(selectedCards)}
           hidden={gameOver || serverState.currentPlayerId !== serverState.yourId}
         >
           {selectedCards.length === 0 ? 'Passen' : 'Spielen'}

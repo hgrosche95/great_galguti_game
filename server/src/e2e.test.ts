@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { WebSocket } from 'ws';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { WebSocket, type RawData } from 'ws';
 import type { AddressInfo } from 'net';
-import { httpServer } from './index';
+import { httpServer, resetGame } from './index';
+import { createAccessToken } from './auth/jwt';
 
 let baseUrl: string;
 let wsUrl: string;
@@ -24,6 +25,40 @@ function waitForFirstMessageOrClose(ws: WebSocket): Promise<{ type: string } | {
     ws.once('message', (raw) => resolve(JSON.parse(raw.toString())));
     ws.once('close', () => resolve({ closed: true }));
   });
+}
+
+// Wartet auf die erste Nachricht eines bestimmten Typs und ignoriert alle anderen
+// (z.B. die 'waiting'-Nachrichten, die bei jedem neuen Mitspieler verschickt werden).
+function waitForMessage(ws: WebSocket, type: string): Promise<{ type: string }> {
+  return new Promise((resolve) => {
+    const onMessage = (raw: RawData) => {
+      const message = JSON.parse(raw.toString());
+      if (message.type === type) {
+        ws.off('message', onMessage);
+        resolve(message);
+      }
+    };
+    ws.on('message', onMessage);
+  });
+}
+
+// Token direkt signieren statt ueber /auth/guest -> braucht keine Datenbank.
+let nextTestUserId = 100000;
+async function connectPlayer(): Promise<WebSocket> {
+  const ws = new WebSocket(wsUrl);
+  await new Promise((resolve) => ws.once('open', resolve));
+  const token = createAccessToken({ sub: nextTestUserId++, username: 'test' });
+  ws.send(JSON.stringify({ type: 'auth', token }));
+  const result = await waitForFirstMessageOrClose(ws);
+  expect(result).toMatchObject({ type: 'waiting' });
+  return ws;
+}
+
+async function startGame(ws: WebSocket) {
+  // Listener VOR dem Senden anhaengen, sonst kann die Antwort verpasst werden.
+  const state = waitForMessage(ws, 'state');
+  ws.send(JSON.stringify({ type: 'start' }));
+  await state;
 }
 
 describe('Auth E2E Flow', () => {
@@ -82,6 +117,71 @@ describe('Auth E2E Flow', () => {
 
     const result = await waitForFirstMessageOrClose(ws);
     expect(result).toEqual({ closed: true });
+  });
+});
+
+describe('Robustheit: Server bleibt bei boesartigen Nachrichten stabil', () => {
+  beforeEach(() => {
+    resetGame();
+  });
+
+  it.each(['{kaputt', 'null', '42'])('ueberlebt ungueltiges JSON ohne Auth: %s', async (payload) => {
+    const ws = new WebSocket(wsUrl);
+    await new Promise((resolve) => ws.once('open', resolve));
+    ws.send(payload);
+
+    const result = await waitForFirstMessageOrClose(ws);
+    expect(result).toEqual({ closed: true });
+
+    // Server lebt noch: ein neuer Spieler kann beitreten
+    const other = await connectPlayer();
+    other.close();
+  });
+
+  it('ueberlebt kaputte Zuege eines eingeloggten Spielers', async () => {
+    const [a, b, c] = await Promise.all([connectPlayer(), connectPlayer(), connectPlayer()]);
+    await startGame(a);
+
+    a.send('{kaputt');
+    a.send(JSON.stringify({ type: 'move', cards: 'keine-liste' }));
+    a.send(JSON.stringify({ type: 'move', cards: [null] }));
+
+    // a ist noch verbunden und der Server reagiert weiter
+    const other = await connectPlayer();
+    expect(a.readyState).toBe(WebSocket.OPEN);
+
+    [a, b, c, other].forEach(ws => ws.close());
+  });
+
+  it('Beitritt waehrend eines laufenden Spiels crasht den Server nicht', async () => {
+    const [a, b, c] = await Promise.all([connectPlayer(), connectPlayer(), connectPlayer()]);
+    await startGame(a);
+
+    const late = await connectPlayer();
+    late.send(JSON.stringify({ type: 'move', cards: [] }));
+
+    // c geht -> broadcastGameState() laeuft auch ueber die Verbindung von 'late'
+    const update = waitForMessage(a, 'state');
+    c.close();
+    await update;
+
+    [a, b, late].forEach(ws => ws.close());
+  });
+
+  it("'start' waehrend eines laufenden Spiels setzt das Spiel nicht zurueck", async () => {
+    const [a, b, c] = await Promise.all([connectPlayer(), connectPlayer(), connectPlayer()]);
+    await startGame(a);
+
+    let restarted = false;
+    a.on('message', (raw) => {
+      if (JSON.parse(raw.toString()).type === 'state') restarted = true;
+    });
+    b.send(JSON.stringify({ type: 'start' }));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(restarted).toBe(false);
+
+    [a, b, c].forEach(ws => ws.close());
   });
 });
 
