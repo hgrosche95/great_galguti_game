@@ -205,3 +205,37 @@ describe('CORS', () => {
     expect(res.headers.get('access-control-allow-origin')).toBeNull();
   });
 });
+
+describe('Rate-Limits auf den Auth-Routen', () => {
+  // Jeder Test nutzt eine eigene (erfundene) Client-IP ueber X-Forwarded-For.
+  // So stoeren sich die Tests nicht gegenseitig, und es ist gleich mitgeprueft,
+  // dass 'trust proxy' greift (sonst zaehlte alles fuer 127.0.0.1).
+  // Leerer Body -> 400 vor jedem DB-Zugriff, die Tests brauchen also keine Datenbank.
+  function postFrom(ip: string, path: string) {
+    return fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
+      body: '{}',
+    });
+  }
+
+  it('sperrt Login nach 10 Fehlversuchen, aber nur fuer diese IP', async () => {
+    for (let i = 0; i < 10; i++) {
+      expect((await postFrom('203.0.113.1', '/auth/login')).status).toBe(400);
+    }
+
+    const blocked = await postFrom('203.0.113.1', '/auth/login');
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: expect.stringContaining('Login-Versuche') });
+
+    // eine andere IP ist davon nicht betroffen
+    expect((await postFrom('203.0.113.2', '/auth/login')).status).toBe(400);
+  });
+
+  it('sperrt Registrierung nach 5 Anfragen', async () => {
+    for (let i = 0; i < 5; i++) {
+      expect((await postFrom('203.0.113.3', '/auth/register')).status).toBe(400);
+    }
+    expect((await postFrom('203.0.113.3', '/auth/register')).status).toBe(429);
+  });
+});

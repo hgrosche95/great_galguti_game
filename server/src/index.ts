@@ -96,6 +96,10 @@ function isValidCardList(value: unknown): value is { value: number; isJoker: boo
 const ALLOWED_ORIGIN_PATTERN = /^https:\/\/[a-z0-9.-]+\.azurestaticapps\.net$/;
 
 const app = express();
+// Azure Container Apps setzt genau einen Proxy (Ingress) vor den Server. Ohne
+// diese Einstellung waere req.ip immer die Proxy-IP, und alle Spieler teilten
+// sich ein einziges Rate-Limit. So kommt die echte Client-IP aus X-Forwarded-For.
+app.set('trust proxy', 1);
 app.use(cors({
   origin: (origin, callback) => {
     // kein Origin-Header = kein Browser (curl, Server-zu-Server) -> erlauben
