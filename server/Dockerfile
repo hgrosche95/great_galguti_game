@@ -1,4 +1,4 @@
-FROM node:22-slim AS build
+FROM node:24-slim AS build
 WORKDIR /app
 
 COPY server/package.json server/package-lock.json ./server/
@@ -14,7 +14,7 @@ FROM build AS prune
 WORKDIR /app
 RUN cd server && npm prune --omit=dev
 
-FROM node:22-slim
+FROM node:24-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
