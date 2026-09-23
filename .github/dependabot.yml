@@ -1,0 +1,25 @@
+# Wöchentliche Update-PRs statt Sicherheitslücken erst beim nächsten Review zu
+# finden. Minor- und Patch-Updates kommen gebündelt als ein PR pro Ökosystem,
+# Major-Updates einzeln, weil die meist Code-Änderungen brauchen.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories: [/, /server, /web]
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /server
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
