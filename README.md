@@ -4,6 +4,8 @@ Ein rundenbasiertes Kartenspiel nach Stichspiel-Logik für 3–8 Spieler, geschr
 
 **Live spielen:** https://blue-sea-08b19cb0f.7.azurestaticapps.net
 
+**Projektziel:** Ein Lernprojekt, bei dem jede Zeile Code selbst geschrieben ist, Schritt für Schritt vom reinen Spielregel-Kern bis zum Online-Mehrspieler auf Azure. Dazu gehört ein professioneller Workflow: Tests, CI-Pipeline und ein geschützter `main`-Branch, auf den nur per Pull Request gemerged wird.
+
 ## Screenshots
 
 | Login | Partie |
@@ -99,6 +101,13 @@ In Produktion müssen `JWT_ACCESS_SECRET` und `JWT_REFRESH_SECRET` als Umgebungs
 - **Datenbank**: Azure Database for PostgreSQL (Flexible Server, Burstable-Tier). Verbindung läuft über ein Container-App-Secret (`DATABASE_URL`), Migrationen wendet der Container beim Start selbst an. Einmaliges Setup: `./scripts/setup-azure-postgres.sh`.
 
 Zusammen ergibt das ein öffentlich erreichbares Online-Spiel — mehrere echte Spieler von unterschiedlichen Orten können gemeinsam eine Partie spielen.
+
+### Gut zu wissen beim Spielen
+
+- **Es gibt genau eine Partie gleichzeitig.** Alle, die die Seite öffnen, landen im selben Warteraum (maximal 8 Plätze inklusive Bots).
+- **Beitritt während einer laufenden Partie:** Du wartest im Warteraum und bist dabei, sobald jemand nach Spielende eine neue Partie startet.
+- **Verbindungsabbruch:** Wer mitten in der Partie die Verbindung verliert, wird ab dann übersprungen. Ein Wiedereinstieg in dieselbe Partie ist (noch) nicht möglich. Verlassen alle menschlichen Spieler die Partie, wird sie verworfen.
+- Der Spielstand liegt nur im Arbeitsspeicher des Servers. Bei einem Neustart oder Deployment geht eine laufende Partie verloren.
 
 ## Mitentwickeln
 
