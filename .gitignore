@@ -1,7 +1,6 @@
 node_modules/
 dist/
 scripts/.setup-azure-deploy-oidc.env
-scripts/.setup-azure-postgres.env
 .env
 !.env.example
 server/generated/

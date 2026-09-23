@@ -4,6 +4,7 @@ import { createUser, findUserByEmail, findUserById, findUserByUsername, type Use
 import { hashPassword, verifyPassword } from './password';
 import { createAccessToken, createRefreshToken, verifyRefreshToken } from './jwt';
 import { requireAuth, type AuthenticatedRequest } from './middleware';
+import { guestLimiter, loginLimiter, registerLimiter } from './rateLimits';
 
 export const authRouter = Router();
 
@@ -26,7 +27,7 @@ function issueTokens(user: User) {
   };
 }
 
-authRouter.post('/register', async (req, res) => {
+authRouter.post('/register', registerLimiter, async (req, res) => {
   const { username, email, password } = req.body ?? {};
 
   if (typeof username !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
@@ -60,7 +61,7 @@ authRouter.post('/register', async (req, res) => {
 // Infrastruktur wie Register/Login, deshalb bleibt die WS-Token-Pflicht
 // unveraendert - ein Gast ist einfach ein Nutzer, den sich der Server selbst
 // ausgedacht hat, statt jemand, der ganz ohne Token spielen darf.
-authRouter.post('/guest', async (req, res) => {
+authRouter.post('/guest', guestLimiter, async (req, res) => {
   const guestId = randomUUID();
   const username = `Gast-${guestId.slice(0, 6)}`;
   const email = `guest-${guestId}@guest.local`;
@@ -71,7 +72,7 @@ authRouter.post('/guest', async (req, res) => {
   res.status(201).json({ id: user.id, username: user.username, email: user.email, ...issueTokens(user) });
 });
 
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body ?? {};
 
   if (typeof email !== 'string' || typeof password !== 'string') {
