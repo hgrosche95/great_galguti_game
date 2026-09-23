@@ -1,10 +1,20 @@
 import jwt from 'jsonwebtoken';
 
 // In Produktion via Azure Container App-Secrets als Umgebungsvariable setzen.
-// Die Dev-Fallbacks sind bewusst offensichtlich unsicher, damit niemand sie
-// versehentlich in Produktion verwendet, ohne es zu merken.
-const ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET ?? 'dev-access-secret-change-in-production';
-const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret-change-in-production';
+// Lokal und in Tests greift ein Dev-Fallback. In Produktion bricht der Server
+// stattdessen beim Start ab: der Fallback steht oeffentlich im Repo, damit
+// koennte jeder Tokens faelschen.
+function requireSecret(name: string, devFallback: string): string {
+  const value = process.env[name];
+  if (value) return value;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`${name} fehlt - in Produktion ist kein Dev-Fallback erlaubt`);
+  }
+  return devFallback;
+}
+
+const ACCESS_TOKEN_SECRET = requireSecret('JWT_ACCESS_SECRET', 'dev-access-secret-change-in-production');
+const REFRESH_TOKEN_SECRET = requireSecret('JWT_REFRESH_SECRET', 'dev-refresh-secret-change-in-production');
 
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL = '7d';

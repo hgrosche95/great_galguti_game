@@ -16,6 +16,7 @@ RUN cd server && npm prune --omit=dev
 
 FROM node:22-slim
 WORKDIR /app
+ENV NODE_ENV=production
 
 # 'prisma migrate deploy' laeuft beim Containerstart, bevor der eigentliche
 # Server (das esbuild-Bundle in dist/index.js) startet - dafuer braucht es

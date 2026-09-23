@@ -92,7 +92,7 @@ Passwörter werden nie im Klartext gespeichert (Hashing mit `bcryptjs`). Das **A
 
 **WebSocket-Beitritt:** Da der Browser beim WebSocket-Verbindungsaufbau keine eigenen Header erlaubt, läuft die Authentifizierung über die erste Nachricht im bestehenden Nachrichtenprotokoll: der Client muss direkt nach dem Verbinden `{ "type": "auth", "token": "<accessToken>" }` senden. Ohne gültiges Token (oder ganz ohne Nachricht innerhalb von 5 Sekunden) trennt der Server die Verbindung, bevor der Client als Spieler aufgenommen wird.
 
-In Produktion müssen `JWT_ACCESS_SECRET` und `JWT_REFRESH_SECRET` als Umgebungsvariablen gesetzt werden (z. B. als Azure Container App-Secrets) — ohne sie greifen bewusst leicht als unsicher erkennbare Entwicklungs-Fallbacks aus `server/src/auth/jwt.ts`.
+In Produktion müssen `JWT_ACCESS_SECRET` und `JWT_REFRESH_SECRET` als Umgebungsvariablen gesetzt werden (z. B. als Azure Container App-Secrets) — fehlt eines davon, bricht der Server beim Start ab (das Docker-Image setzt `NODE_ENV=production`). Lokal und in Tests greifen stattdessen Entwicklungs-Fallbacks aus `server/src/auth/jwt.ts`.
 
 ## Live-Deployment
 
