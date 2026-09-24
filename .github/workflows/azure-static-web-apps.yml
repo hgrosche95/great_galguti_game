@@ -3,8 +3,11 @@ name: Deploy web app to Azure Static Web Apps
 # Nie zwei Deploys gleichzeitig: Azure lehnt parallele Infrastruktur-Deploys
 # ab (DeploymentActive). Ein zweiter Lauf wartet, statt abzubrechen; wartet
 # schon einer, ersetzt ihn der neueste (der enthält ohnehin alle Commits).
+# Push und PR-Ereignisse getrennt gruppieren: Beim Schließen eines PRs setzt
+# GitHub github.ref auf den Basis-Branch. Mit nur github.ref landete der
+# Aufräum-Job in derselben Gruppe wie der Deploy auf main und hat ihn verdrängt.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 env:
