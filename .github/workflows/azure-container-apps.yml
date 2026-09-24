@@ -1,5 +1,12 @@
 name: Deploy server to Azure Container Apps
 
+# Nie zwei Deploys gleichzeitig: Azure lehnt parallele Infrastruktur-Deploys
+# ab (DeploymentActive). Ein zweiter Lauf wartet, statt abzubrechen; wartet
+# schon einer, ersetzt ihn der neueste (der enthält ohnehin alle Commits).
+concurrency:
+  group: deploy-server-production
+  cancel-in-progress: false
+
 env:
   IMAGE_NAME: ghcr.io/hgrosche95/great-galguti-server
   CONTAINER_APP_NAME: great-galguti-server
