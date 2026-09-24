@@ -1,5 +1,12 @@
 name: Deploy web app to Azure Static Web Apps
 
+# Nie zwei Deploys gleichzeitig: Azure lehnt parallele Infrastruktur-Deploys
+# ab (DeploymentActive). Ein zweiter Lauf wartet, statt abzubrechen; wartet
+# schon einer, ersetzt ihn der neueste (der enthält ohnehin alle Commits).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   APP_LOCATION: "/web"
   OUTPUT_LOCATION: "dist"
