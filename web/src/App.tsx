@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getMoveValue } from '../../src/rules';
 import type { Card } from '../../src/cards';
 import LoginScreen from './LoginScreen';
+import { clearRefreshToken, fetchAccessToken, loadRefreshToken, saveRefreshToken } from './session';
 import './App.css';
 
 const SERVER_HOST = import.meta.env.DEV
@@ -33,7 +34,8 @@ function CardFace({ card }: { card: Card }) {
 }
 
 function App() {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(() => loadRefreshToken());
+  const [connectionLost, setConnectionLost] = useState(false);
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
   const [waitingCount, setWaitingCount] = useState(0);
   const [serverState, setServerState] = useState<ServerState | null>(null);
@@ -53,29 +55,86 @@ function App() {
     socketRef.current?.send(JSON.stringify({ type: 'setName', name }));
   };
 
+  const handleAuthenticated = (token: string) => {
+    saveRefreshToken(token);
+    setRefreshToken(token);
+  };
+
+  const logout = () => {
+    clearRefreshToken();
+    setRefreshToken(null);
+    setServerState(null);
+  };
+
   useEffect(() => {
-    if (!accessToken) return;
+    if (!refreshToken) return;
 
-    const ws = new WebSocket(WS_URL);
-    socketRef.current = ws;
+    let ws: WebSocket | null = null;
+    let stopped = false;
+    let attempt = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'auth', token: accessToken }));
+    // Wartezeit wächst bei wiederholten Fehlschlägen: 1 s, 2 s, 4 s ... max. 15 s
+    const scheduleReconnect = () => {
+      const delay = Math.min(15_000, 1_000 * 2 ** attempt);
+      attempt++;
+      retryTimer = setTimeout(connect, delay);
     };
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'waiting') {
-        setWaitingCount(data.count);
-      } else if (data.type === 'state') {
-        setServerState(data);
+    const connect = async () => {
+      let accessToken: string | null;
+      try {
+        // Vor jedem Verbindungsaufbau ein frisches Access-Token (15 min gültig)
+        accessToken = await fetchAccessToken(API_URL, refreshToken);
+      } catch {
+        scheduleReconnect(); // Server nicht erreichbar, z. B. Kaltstart
+        return;
       }
+      if (stopped) return;
+      if (!accessToken) {
+        // Sitzung abgelaufen: zurück zum Login
+        clearRefreshToken();
+        setRefreshToken(null);
+        return;
+      }
+
+      ws = new WebSocket(WS_URL);
+      socketRef.current = ws;
+
+      ws.onopen = () => {
+        attempt = 0;
+        setConnectionLost(false);
+        ws?.send(JSON.stringify({ type: 'auth', token: accessToken }));
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'waiting') {
+          setWaitingCount(data.count);
+        } else if (data.type === 'state') {
+          setServerState(data);
+        }
+      };
+
+      // Unerwartet getrennt (Netz weg, Server neu gestartet): neu verbinden.
+      // Der Server kennt die neue Verbindung als neuen Spieler, deshalb geht
+      // es im Warteraum weiter, nicht in der alten Partie.
+      ws.onclose = () => {
+        if (stopped) return;
+        setServerState(null);
+        setConnectionLost(true);
+        scheduleReconnect();
+      };
     };
+
+    connect();
 
     return () => {
-      ws.close();
+      stopped = true;
+      clearTimeout(retryTimer);
+      ws?.close();
     };
-  }, [accessToken]);
+  }, [refreshToken]);
 
   const selectCard = (card: Card) => {
     if (selectedCards.includes(card)) {
@@ -93,14 +152,17 @@ function App() {
     setSelectedCards([]);
   };
 
-  if (!accessToken) {
-    return <LoginScreen apiUrl={API_URL} onAuthenticated={setAccessToken} />;
+  if (!refreshToken) {
+    return <LoginScreen apiUrl={API_URL} onAuthenticated={handleAuthenticated} />;
   }
 
   if (!serverState) {
     return (
       <div className="game">
         <h1 className="brand">Great Galguti</h1>
+        {connectionLost && (
+          <p className="connection-lost">Verbindung verloren, verbinde neu …</p>
+        )}
         <p>Warte auf Mitspieler: {waitingCount} verbunden</p>
         <input
           className="name-input"
@@ -114,6 +176,7 @@ function App() {
           <button className="action-button secondary" onClick={sendAddBot}>Bot hinzufügen</button>
           <button className="action-button" onClick={sendStart}>Spiel starten</button>
         </div>
+        <button className="link-button" onClick={logout}>Abmelden</button>
       </div>
     );
   }
