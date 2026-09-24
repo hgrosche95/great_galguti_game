@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react';
 
 interface LoginScreenProps {
   apiUrl: string;
-  onAuthenticated: (accessToken: string) => void;
+  // Das Refresh-Token ist die Sitzung, das Access-Token holt sich App.tsx selbst.
+  onAuthenticated: (refreshToken: string) => void;
 }
 
 function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
@@ -34,7 +35,7 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
         return;
       }
 
-      onAuthenticated(data.accessToken);
+      onAuthenticated(data.refreshToken);
     } catch {
       setError('Server nicht erreichbar');
     } finally {
@@ -55,7 +56,7 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
         return;
       }
 
-      onAuthenticated(data.accessToken);
+      onAuthenticated(data.refreshToken);
     } catch {
       setError('Server nicht erreichbar');
     } finally {

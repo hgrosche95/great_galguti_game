@@ -490,3 +490,18 @@ button.card:hover {
   font: italic 500 13px var(--sans);
   padding: 0;
 }
+
+.connection-lost {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.link-button {
+  margin-top: 1rem;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.7;
+  text-decoration: underline;
+  cursor: pointer;
+}
