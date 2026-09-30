@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import Brand from './Brand';
+import { ShuffleCards } from './LoadingScreen';
+import { useDelayedFlag } from './useDelayedFlag';
 
 interface LoginScreenProps {
   apiUrl: string;
@@ -14,6 +16,7 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const slow = useDelayedFlag(loading, 4_000);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -99,6 +102,17 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
         />
 
         {error && <div className="login-error">{error}</div>}
+
+        {loading && (
+          <div className="login-loading" role="status" aria-live="polite">
+            <ShuffleCards />
+            <span>
+              {slow
+                ? 'Der Server wacht gerade auf. Das kann bis zu einer halben Minute dauern.'
+                : 'Einen Moment …'}
+            </span>
+          </div>
+        )}
 
         <button type="submit" className="action-button" disabled={loading}>
           {mode === 'login' ? 'Einloggen' : 'Registrieren'}

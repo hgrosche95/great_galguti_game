@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { getMoveValue, isValidMove } from '../../src/rules';
 import type { Card } from '../../src/cards';
 import Brand from './Brand';
+import LoadingScreen from './LoadingScreen';
 import LoginScreen from './LoginScreen';
 import { clearRefreshToken, fetchAccessToken, loadRefreshToken, saveRefreshToken } from './session';
 import './App.css';
@@ -78,6 +79,9 @@ function initials(name: string) {
   return letters.toUpperCase() || '?';
 }
 
+// Der Server startet eine Partie erst ab 3 Teilnehmern (Menschen und Bots)
+const MIN_PLAYERS = 3;
+
 const NARROW_QUERY = '(max-width: 600px)';
 
 // Auf schmalen Bildschirmen wird die Hand in mehrere Fächer umbrochen
@@ -99,12 +103,26 @@ function App() {
   const [waitingCount, setWaitingCount] = useState(0);
   const [serverState, setServerState] = useState<ServerState | null>(null);
   const [name, setName] = useState('');
+  // Erst wenn der Server die erste Nachricht schickt, steht die Verbindung wirklich
+  const [lobbyReady, setLobbyReady] = useState(false);
+  // "Spiel starten" gedrückt, aber noch kein Spielstand vom Server da
+  const [starting, setStarting] = useState(false);
 
   const socketRef = useRef<WebSocket | null>(null);
+  const startTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const narrow = useIsNarrow();
 
   const sendStart = () => {
     socketRef.current?.send(JSON.stringify({ type: 'start' }));
+    setStarting(true);
+    // Falls der Server den Start ablehnt, hängt der Button nicht für immer
+    clearTimeout(startTimerRef.current);
+    startTimerRef.current = setTimeout(() => setStarting(false), 15_000);
+  };
+
+  const stopStarting = () => {
+    clearTimeout(startTimerRef.current);
+    setStarting(false);
   };
 
   const sendAddBot = () => {
@@ -124,6 +142,8 @@ function App() {
     clearRefreshToken();
     setRefreshToken(null);
     setServerState(null);
+    setLobbyReady(false);
+    stopStarting();
   };
 
   useEffect(() => {
@@ -169,11 +189,14 @@ function App() {
 
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        setLobbyReady(true);
         if (data.type === 'waiting') {
           setWaitingCount(data.count);
         } else if (data.type === 'state') {
           setServerState(data);
           setSelectedCards(prev => keepSelection(prev, data.yourHand));
+          clearTimeout(startTimerRef.current);
+          setStarting(false);
         }
       };
 
@@ -183,6 +206,9 @@ function App() {
       ws.onclose = () => {
         if (stopped) return;
         setServerState(null);
+        setLobbyReady(false);
+        clearTimeout(startTimerRef.current);
+        setStarting(false);
         setConnectionLost(true);
         scheduleReconnect();
       };
@@ -217,14 +243,21 @@ function App() {
     return <LoginScreen apiUrl={API_URL} onAuthenticated={handleAuthenticated} />;
   }
 
+  if (!serverState && !lobbyReady) {
+    return (
+      <LoadingScreen
+        title={connectionLost ? 'Verbindung verloren, verbinde neu …' : 'Verbinde mit dem Tisch …'}
+        onCancel={logout}
+      />
+    );
+  }
+
   if (!serverState) {
+    const enoughPlayers = waitingCount >= MIN_PLAYERS;
     return (
       <div className="game lobby">
         <Brand subtitle="Warteraum" />
         <div className="lobby-panel">
-          {connectionLost && (
-            <p className="connection-lost">Verbindung verloren, verbinde neu …</p>
-          )}
           <p className="lobby-count">
             <span className="lobby-count-number">{waitingCount}</span>
             Spieler verbunden
@@ -238,9 +271,18 @@ function App() {
             onBlur={sendSetName}
           />
           <div className="waitroom-actions">
-            <button className="action-button secondary" onClick={sendAddBot}>Bot hinzufügen</button>
-            <button className="action-button" onClick={sendStart}>Spiel starten</button>
+            <button className="action-button secondary" onClick={sendAddBot} disabled={starting}>Bot hinzufügen</button>
+            <button
+              className={`action-button${starting ? ' busy' : ''}`}
+              onClick={sendStart}
+              disabled={starting || !enoughPlayers}
+            >
+              {starting ? 'Mische Karten …' : 'Spiel starten'}
+            </button>
           </div>
+          {!enoughPlayers && (
+            <p className="lobby-hint">Ab {MIN_PLAYERS} Spielern geht es los. Bots zählen mit.</p>
+          )}
         </div>
         <button className="link-button" onClick={logout}>Abmelden</button>
       </div>
@@ -343,7 +385,9 @@ function App() {
                 <li key={id} className={id === serverState.yourId ? 'me' : undefined}>{nameOf(id)}</li>
               ))}
             </ol>
-            <button className="action-button" onClick={sendStart}>Nochmal spielen</button>
+            <button className={`action-button${starting ? ' busy' : ''}`} onClick={sendStart} disabled={starting}>
+              {starting ? 'Mische Karten …' : 'Nochmal spielen'}
+            </button>
           </>
         ) : lastMove ? (
           <>
