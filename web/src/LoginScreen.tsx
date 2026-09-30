@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import Brand from './Brand';
 
 interface LoginScreenProps {
   apiUrl: string;
@@ -65,8 +66,8 @@ function LoginScreen({ apiUrl, onAuthenticated }: LoginScreenProps) {
   };
 
   return (
-    <div className="game">
-      <h1 className="brand">Great Galguti</h1>
+    <div className="game lobby">
+      <Brand subtitle="Ein Stichspiel für 3 bis 8 Spieler" />
       <form onSubmit={submit} className="login-form">
         <h2>{mode === 'login' ? 'Einloggen' : 'Registrieren'}</h2>
 

@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { getMoveValue } from '../../src/rules';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { getMoveValue, isValidMove } from '../../src/rules';
 import type { Card } from '../../src/cards';
+import Brand from './Brand';
 import LoginScreen from './LoginScreen';
 import { clearRefreshToken, fetchAccessToken, loadRefreshToken, saveRefreshToken } from './session';
 import './App.css';
@@ -29,8 +30,66 @@ interface ServerState {
   players: ServerPlayer[];
 }
 
+function cardLabel(card: Card) {
+  return card.isJoker ? 'J' : String(card.value);
+}
+
+// Aufgedeckte Karte: Eckindex oben links, großer Wert, Eckindex unten rechts
 function CardFace({ card }: { card: Card }) {
-  return <>{card.isJoker ? 'J' : card.value}</>;
+  const label = cardLabel(card);
+  return (
+    <>
+      <span className="card-index top">{label}</span>
+      <span className="card-value">{label}</span>
+      <span className="card-index bottom">{label}</span>
+    </>
+  );
+}
+
+// Kleiner Fächer aus Rückseiten für die Gegner, gedeckelt auf 10 Karten
+function CardBacks({ count }: { count: number }) {
+  const shown = Math.min(count, 10);
+  return (
+    <div className="mini-fan" aria-hidden="true">
+      {Array.from({ length: shown }).map((_, i) => (
+        <span key={i} className="card back" style={{ '--r': `${(i - (shown - 1) / 2) * 6}deg` } as CSSProperties} />
+      ))}
+    </div>
+  );
+}
+
+// Neue Karten-Objekte vom Server: die Auswahl auf gleichwertige Karten der neuen Hand übertragen
+function keepSelection(selected: Card[], hand: Card[]): Card[] {
+  const remaining = [...hand];
+  const kept: Card[] = [];
+  for (const card of selected) {
+    const index = remaining.findIndex(c => c.value === card.value && c.isJoker === card.isJoker);
+    if (index === -1) continue;
+    kept.push(remaining[index]!);
+    remaining.splice(index, 1);
+  }
+  return kept;
+}
+
+// "Bot 2" -> "B2", "Henrik" -> "HE", "Anna Berg" -> "AB"
+function initials(name: string) {
+  const words = name.trim().split(/\s+/);
+  const letters = words.length > 1 ? words[0]![0]! + words[1]![0]! : name.trim().slice(0, 2);
+  return letters.toUpperCase() || '?';
+}
+
+const NARROW_QUERY = '(max-width: 600px)';
+
+// Auf schmalen Bildschirmen wird die Hand in mehrere Fächer umbrochen
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW_QUERY).matches);
+  useEffect(() => {
+    const media = window.matchMedia(NARROW_QUERY);
+    const onChange = () => setNarrow(media.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+  return narrow;
 }
 
 function App() {
@@ -42,6 +101,7 @@ function App() {
   const [name, setName] = useState('');
 
   const socketRef = useRef<WebSocket | null>(null);
+  const narrow = useIsNarrow();
 
   const sendStart = () => {
     socketRef.current?.send(JSON.stringify({ type: 'start' }));
@@ -113,6 +173,7 @@ function App() {
           setWaitingCount(data.count);
         } else if (data.type === 'state') {
           setServerState(data);
+          setSelectedCards(prev => keepSelection(prev, data.yourHand));
         }
       };
 
@@ -158,23 +219,28 @@ function App() {
 
   if (!serverState) {
     return (
-      <div className="game">
-        <h1 className="brand">Great Galguti</h1>
-        {connectionLost && (
-          <p className="connection-lost">Verbindung verloren, verbinde neu …</p>
-        )}
-        <p>Warte auf Mitspieler: {waitingCount} verbunden</p>
-        <input
-          className="name-input"
-          type="text"
-          placeholder="Dein Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={sendSetName}
-        />
-        <div className="waitroom-actions">
-          <button className="action-button secondary" onClick={sendAddBot}>Bot hinzufügen</button>
-          <button className="action-button" onClick={sendStart}>Spiel starten</button>
+      <div className="game lobby">
+        <Brand subtitle="Warteraum" />
+        <div className="lobby-panel">
+          {connectionLost && (
+            <p className="connection-lost">Verbindung verloren, verbinde neu …</p>
+          )}
+          <p className="lobby-count">
+            <span className="lobby-count-number">{waitingCount}</span>
+            Spieler verbunden
+          </p>
+          <input
+            className="name-input"
+            type="text"
+            placeholder="Dein Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={sendSetName}
+          />
+          <div className="waitroom-actions">
+            <button className="action-button secondary" onClick={sendAddBot}>Bot hinzufügen</button>
+            <button className="action-button" onClick={sendStart}>Spiel starten</button>
+          </div>
         </div>
         <button className="link-button" onClick={logout}>Abmelden</button>
       </div>
@@ -183,120 +249,157 @@ function App() {
 
   const others = serverState.players.filter(p => p.id !== serverState.yourId);
   const gameOver = serverState.gameOver;
+  const isMyTurn = !gameOver && serverState.currentPlayerId === serverState.yourId;
+  const lastMove = serverState.lastMove && serverState.lastMove.length > 0 ? serverState.lastMove : null;
 
-  const maxValue = serverState.lastMove ? getMoveValue(serverState.lastMove) : null;
+  const maxValue = lastMove ? getMoveValue(lastMove) : null;
   const isPlayable = (card: Card) => card.isJoker || maxValue === null || card.value < maxValue;
+  const canPlay = isMyTurn && selectedCards.length > 0 && isValidMove(selectedCards, lastMove);
+  const canPass = isMyTurn && lastMove !== null;
+  const selectedValue = getMoveValue(selectedCards);
+  const playLabel = canPlay
+    ? `${selectedCards.length}× ${selectedValue === 13 ? 'Joker' : selectedValue} spielen`
+    : selectedCards.length === 0 ? 'Karten wählen' : 'Ungültige Auswahl';
 
-  const visibleHand = [...serverState.yourHand]
-    .filter(card => !selectedCards.includes(card))
-    .sort((a, b) => a.value - b.value);
+  // Joker haben den Wert 13 und landen dadurch automatisch rechts
+  const sortedHand = [...serverState.yourHand].sort((a, b) => a.value - b.value);
 
-  const handGroups: Card[][] = [];
-  for (const card of visibleHand) {
-    const lastGroup = handGroups[handGroups.length - 1];
-    if (lastGroup && lastGroup[0]!.value === card.value) {
-      lastGroup.push(card);
-    } else {
-      handGroups.push([card]);
-    }
+  // Ab 17 Karten wird die Hand auf dem Handy in mehrere Fächer umbrochen
+  const rowSize = narrow ? 16 : 30;
+  const rowCount = Math.ceil(sortedHand.length / rowSize);
+  const perRow = Math.ceil(sortedHand.length / Math.max(rowCount, 1));
+  const handRows: Card[][] = [];
+  for (let i = 0; i < sortedHand.length; i += perRow) {
+    handRows.push(sortedHand.slice(i, i + perRow));
   }
 
-  const currentPlayerName =
-    serverState.currentPlayerId === serverState.yourId
-      ? 'Du'
-      : (serverState.players.find(p => p.id === serverState.currentPlayerId)?.name ?? '?');
+  // Bei drei und mehr Gegnern sitzt der erste links, der letzte rechts, der Rest oben
+  const seatOf = (index: number) => {
+    if (others.length < 3) return 'top';
+    if (index === 0) return 'left';
+    if (index === others.length - 1) return 'right';
+    return 'top';
+  };
+
+  const nameOf = (id: number) =>
+    id === serverState.yourId ? 'Du' : (serverState.players.find(p => p.id === id)?.name ?? '?');
+
+  const statusText = gameOver
+    ? 'Spiel vorbei'
+    : isMyTurn
+      ? 'Du bist dran'
+      : `${nameOf(serverState.currentPlayerId)} ist am Zug`;
+
+  const renderSeat = (player: ServerPlayer) => {
+    const finished = player.cardCount === 0;
+    const passed = !finished && !player.isActive;
+    const isTurn = !gameOver && serverState.currentPlayerId === player.id;
+    return (
+      <div key={player.id} className={`seat${isTurn ? ' turn' : ''}${passed || finished ? ' idle' : ''}`}>
+        <div className="avatar">{initials(player.name)}</div>
+        <div className="seat-name">{player.name}</div>
+        <CardBacks count={player.cardCount} />
+        <div className="seat-count">{player.cardCount} {player.cardCount === 1 ? 'Karte' : 'Karten'}</div>
+        {finished && <span className="chip done">fertig</span>}
+        {passed && <span className="chip">passt</span>}
+        {isTurn && <span className="chip live">am Zug</span>}
+      </div>
+    );
+  };
+
+  const seatGroups = { top: [] as ServerPlayer[], left: [] as ServerPlayer[], right: [] as ServerPlayer[] };
+  others.forEach((player, i) => seatGroups[seatOf(i)].push(player));
+
+  // Leichte, feste Streuung für die Karten auf dem Tisch
+  const pileTilt = (i: number, count: number) => {
+    const t = count > 1 ? i / (count - 1) - 0.5 : 0;
+    return {
+      '--x': `${t * Math.min(count * 30, 140)}px`,
+      '--y': `${(i % 2 === 0 ? 1 : -1) * 4}px`,
+      '--r': `${t * 20 + (i % 2 === 0 ? -2 : 2)}deg`,
+    } as CSSProperties;
+  };
 
   return (
-    <div className="game">
-      <div className="opponents">
-        {others.map(player => (
-          <div
-            key={player.id}
-            className={`opponent${serverState.currentPlayerId === player.id ? ' active' : ''}`}
-          >
-            <div className="opponent-name">{player.name}</div>
-            <div className="card-stack">
-              {Array.from({ length: player.cardCount }).map((_, i) => (
-                <div key={i} className="card back" />
-              ))}
-            </div>
-            <div className="opponent-count">{player.cardCount} Karten</div>
-          </div>
-        ))}
-      </div>
+    <div className="game in-game">
+      <header className="hud">
+        <Brand />
+        <div className="hud-meta">
+          <div>Am Zug<b>{gameOver ? '–' : nameOf(serverState.currentPlayerId)}</b></div>
+          <div>Deine Karten<b>{serverState.yourHand.length}</b></div>
+        </div>
+      </header>
+
+      <div className={`seats-top${seatGroups.top.length > 2 ? ' crowded' : ''}`}>{seatGroups.top.map(renderSeat)}</div>
+      <div className="seats-left">{seatGroups.left.map(renderSeat)}</div>
+      <div className="seats-right">{seatGroups.right.map(renderSeat)}</div>
 
       <div className="table">
-        <div className="table-status">
-          {gameOver ? 'Spiel vorbei' : `${currentPlayerName} ${serverState.currentPlayerId === serverState.yourId ? 'bist dran' : 'ist am Zug'}`}
-        </div>
+        <div className="table-status">{statusText}</div>
         {gameOver ? (
           <>
             <ol className="ranking">
               {serverState.ranking.map(id => (
-                <li key={id}>
-                  {id === serverState.yourId ? 'Du' : serverState.players.find(p => p.id === id)?.name}
-                </li>
+                <li key={id} className={id === serverState.yourId ? 'me' : undefined}>{nameOf(id)}</li>
               ))}
             </ol>
             <button className="action-button" onClick={sendStart}>Nochmal spielen</button>
           </>
-        ) : (
-          <div className="played-cards">
-            {serverState.lastMove && serverState.lastMove.length > 0 ? (
-              serverState.lastMove.map((card, i) => (
-                <div key={i} className={`card${card.isJoker ? ' joker' : ''}`} data-idx={card.isJoker ? 'J' : card.value}>
+        ) : lastMove ? (
+          <>
+            <div className="pile">
+              {lastMove.map((card, i) => (
+                <div key={i} className={`card${card.isJoker ? ' joker' : ''}`} style={pileTilt(i, lastMove.length)}>
                   <CardFace card={card} />
                 </div>
-              ))
-            ) : (
-              <div className="table-hint">Noch nichts gelegt</div>
-            )}
-          </div>
+              ))}
+            </div>
+            <div className="table-hint">
+              Zu schlagen: <b>{lastMove.length} {lastMove.length === 1 ? 'Karte' : 'Karten'}</b> mit Wert <b>unter {maxValue}</b>
+            </div>
+          </>
+        ) : (
+          <div className="table-hint">Freie Eröffnung: beliebig viele gleiche Karten</div>
         )}
       </div>
 
       <div className="hand-area">
-        <div className="selected-cards">
-          {selectedCards.map((card, i) => (
-            <button
-              key={i}
-              className={`card selected${card.isJoker ? ' joker' : ''}`}
-              data-idx={card.isJoker ? 'J' : card.value}
-              onClick={() => selectCard(card)}
-            >
-              <CardFace card={card} />
+        {handRows.map((row, ri) => (
+          <div className="hand" key={ri} style={{ '--n': row.length } as CSSProperties}>
+            {row.map((card, i) => {
+              const t = row.length > 1 ? (i - (row.length - 1) / 2) / ((row.length - 1) / 2) : 0;
+              const selected = selectedCards.includes(card);
+              const playable = isPlayable(card);
+              return (
+                <button
+                  key={i}
+                  className={`card${card.isJoker ? ' joker' : ''}${playable ? ' playable' : ''}${selected ? ' selected' : ''}`}
+                  style={{
+                    '--r': `${(t * (narrow ? 8 : 14)).toFixed(2)}deg`,
+                    '--y': `${(t * t * (narrow ? 8 : 18)).toFixed(1)}px`,
+                  } as CSSProperties}
+                  onClick={() => selectCard(card)}
+                  disabled={!playable && !selected}
+                  aria-pressed={selected}
+                  aria-label={card.isJoker ? 'Joker' : `Karte ${card.value}`}
+                >
+                  <CardFace card={card} />
+                </button>
+              );
+            })}
+          </div>
+        ))}
+
+        {isMyTurn && (
+          <div className="actions">
+            <button className="action-button secondary" onClick={() => makeMove([])} disabled={!canPass}>
+              Passen
             </button>
-          ))}
-        </div>
-
-        <div className="hand">
-          {handGroups.map((group, gi) => (
-            <div className="card-group" key={gi}>
-              <div className="card-row">
-                {group.map((card, i) => (
-                  <button
-                    key={i}
-                    className={`card${card.isJoker ? ' joker' : ''}${isPlayable(card) ? ' playable' : ''}`}
-                    data-idx={card.isJoker ? 'J' : card.value}
-                    onClick={() => selectCard(card)}
-                    disabled={!isPlayable(card)}
-                  >
-                    <CardFace card={card} />
-                  </button>
-                ))}
-              </div>
-              {group.length > 1 && <div className="card-group-count">×{group.length}</div>}
-            </div>
-          ))}
-        </div>
-
-        <button
-          className="action-button"
-          onClick={() => makeMove(selectedCards)}
-          hidden={gameOver || serverState.currentPlayerId !== serverState.yourId}
-        >
-          {selectedCards.length === 0 ? 'Passen' : 'Spielen'}
-        </button>
+            <button className="action-button" onClick={() => makeMove(selectedCards)} disabled={!canPlay}>
+              {playLabel}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
